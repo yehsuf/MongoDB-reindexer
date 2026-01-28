@@ -55,22 +55,59 @@ export function isIgnored(name: string, ignoreList: string[]): boolean {
 }
 
 /**
- * Prompt user for input with validation
+ * Help text for a prompt option
+ */
+export interface PromptOption {
+  /** The option value (e.g., 'yes', 'no') */
+  value: string;
+  /** Short description of what this option does */
+  description: string;
+}
+
+/**
+ * Prompt user for input with validation and help support
  * @param question Question to ask
  * @param validAnswers Valid answer options
+ * @param helpText Optional array of help descriptions for each option
  * @returns Tuple of [first character, full word]
  */
-export function promptUser(question: string, validAnswers: string[]): Promise<[string, string]> {
+export function promptUser(
+  question: string, 
+  validAnswers: string[],
+  helpText?: PromptOption[]
+): Promise<[string, string]> {
   return new Promise((resolve) => {
     const rl = readline.createInterface({
       input: process.stdin,
       output: process.stdout
     });
 
+    const showHelp = (): void => {
+      console.log('\n📖 Available options:');
+      if (helpText && helpText.length > 0) {
+        helpText.forEach(option => {
+          const shortcut = option.value[0];
+          console.log(`  ${option.value} (${shortcut}) - ${option.description}`);
+        });
+      } else {
+        validAnswers.forEach(answer => {
+          console.log(`  ${answer} (${answer[0]})`);
+        });
+      }
+      console.log(`  help/? - Show this help message\n`);
+    };
+
     const ask = (): void => {
       rl.question(question, (answer) => {
         const trimmed = answer.trim().toLowerCase();
         const validFirstChars = validAnswers.map(a => a[0]);
+        
+        // Check for help request
+        if (trimmed === 'help' || trimmed === 'h' || trimmed === '?') {
+          showHelp();
+          ask();
+          return;
+        }
         
         if (validAnswers.includes(trimmed)) {
           rl.close();
@@ -88,6 +125,7 @@ export function promptUser(question: string, validAnswers: string[]): Promise<[s
         }
         
         console.log(`Invalid input. Please enter one of: ${validAnswers.join(', ')}`);
+        console.log(`Type 'help' or '?' for more information.`);
         ask();
       });
     };
