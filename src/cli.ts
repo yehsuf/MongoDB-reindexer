@@ -4,12 +4,16 @@ import { Command } from 'commander';
 import { MongoDBReindexer } from './lib/reindexer';
 import { ReindexerConfig } from './types';
 
+// Import package.json to get version
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const pkg = require('../package.json');
+
 const program = new Command();
 
 program
   .name('mongodb-reindex')
   .description('Zero-downtime MongoDB index rebuilding with Cover-Swap-Cleanup strategy')
-  .version('1.0.0');
+  .version(pkg.version);
 
 program
   .command('rebuild')

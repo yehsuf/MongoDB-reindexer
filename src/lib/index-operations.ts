@@ -55,7 +55,8 @@ export class IndexOperations {
     namePrefix: string = 'covering_'
   ): Promise<string> {
     const timestamp = Date.now();
-    const coveringName = `${namePrefix}${timestamp}`;
+    const randomSuffix = Math.random().toString(36).substring(2, 8);
+    const coveringName = `${namePrefix}${timestamp}_${randomSuffix}`;
     
     this.logger.info(`Creating covering index: ${coveringName}`);
     this.logger.debug(`Index spec:`, indexSpec);
@@ -64,8 +65,7 @@ export class IndexOperations {
     try {
       const options = {
         ...indexOptions,
-        name: coveringName,
-        background: true // Build in background for zero-downtime
+        name: coveringName
       };
       
       await this.collection.createIndex(indexSpec, options);
@@ -133,8 +133,7 @@ export class IndexOperations {
       const { name: _name, key, v: _v, ...options } = oldIndex;
       const createOptions = {
         ...options,
-        name: newName,
-        background: true
+        name: newName
       };
       
       this.logger.debug(`Creating new index with name: ${newName}`);

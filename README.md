@@ -160,10 +160,10 @@ The reindexer maintains a state file that allows operations to be resumed after 
 
 ### Resilient Verification
 
-Index verification uses exponential retry with configurable parameters:
+Index verification uses a retry mechanism with configurable parameters:
 
 - Retries up to `maxVerificationRetries` times
-- Waits `verificationRetryDelayMs` between retries
+- Waits `verificationRetryDelayMs` between retries with fixed delay
 - Handles transient network issues
 - Provides detailed diagnostic logging
 
@@ -228,7 +228,7 @@ npm run clean
 ## Requirements
 
 - Node.js >= 16.0.0
-- MongoDB server (any version supported by mongodb driver 6.x)
+- MongoDB server >= 3.6 (any version supported by mongodb driver 6.x)
 - Network access to MongoDB cluster
 
 ## Security Considerations
@@ -236,7 +236,10 @@ npm run clean
 - Always use authentication in production
 - Use secure connection strings (mongodb+srv://)
 - Limit connection permissions to necessary operations
-- Store credentials securely (environment variables, secrets management)
+- **Store credentials securely** using environment variables or secrets management
+- **Avoid passing sensitive URIs via command-line arguments** as they may be logged in shell history
+  - Recommended: Use environment variables (e.g., `export MONGODB_URI="mongodb://..."`)
+  - The CLI accepts environment variables through shell expansion: `--uri "$MONGODB_URI"`
 
 ## License
 

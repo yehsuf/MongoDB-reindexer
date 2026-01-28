@@ -22,8 +22,12 @@
     "zero-downtime",
     "database"
   ],
-  "author": "",
+  "author": "MongoDB Reindexer Contributors",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yehsuf/MongoDB-reindexer.git"
+  },
   "dependencies": {
     "commander": "^11.1.0",
     "mongodb": "^6.3.0"
