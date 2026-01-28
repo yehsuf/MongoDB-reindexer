@@ -1,95 +1,178 @@
-import { Document, IndexSpecification } from 'mongodb';
-
 /**
- * Configuration options for the MongoDB reindexer
+ * Configuration for the MongoDB index rebuild process
  */
-export interface ReindexerConfig {
-  /** MongoDB connection URI */
-  uri: string;
-  /** Database name */
-  database: string;
-  /** Collection name */
-  collection: string;
-  /** Index specification to rebuild */
-  indexSpec: IndexSpecification;
-  /** Index options */
-  indexOptions?: Document;
-  /** State file path for resuming operations */
-  stateFilePath?: string;
-  /** Enable verbose logging */
-  verbose?: boolean;
-  /** Maximum number of verification retries */
-  maxVerificationRetries?: number;
-  /** Verification retry delay in milliseconds */
-  verificationRetryDelayMs?: number;
-  /** Timeout for index operations in milliseconds */
-  operationTimeoutMs?: number;
+export interface RebuildConfig {
+  /** Database name to process */
+  dbName: string;
+  
+  /** Directory for performance logs */
+  logDir?: string;
+  
+  /** Directory for runtime state files */
+  runtimeDir?: string;
+  
+  /** Suffix for covering/temporary indexes */
+  coverSuffix?: string;
+  
+  /** Field name added to covering indexes */
+  cheapSuffixField?: string;
+  
+  /** Enable interactive prompts for safety */
+  safeRun?: boolean;
+  
+  /** Specific collections to process (overrides ignoredCollections) */
+  specifiedCollections?: string[];
+  
+  /** Collections to ignore (supports wildcards with *) */
+  ignoredCollections?: string[];
+  
+  /** Indexes to ignore (supports wildcards with *) */
+  ignoredIndexes?: string[];
+  
+  /** Performance logging configuration */
+  performanceLogging?: {
+    enabled: boolean;
+  };
 }
 
 /**
- * State of the reindex operation
+ * State file structure for resumability
  */
-export enum ReindexState {
-  INITIAL = 'INITIAL',
-  COVERING = 'COVERING',
-  COVERED = 'COVERED',
-  SWAPPING = 'SWAPPING',
-  SWAPPED = 'SWAPPED',
-  CLEANING = 'CLEANING',
-  COMPLETED = 'COMPLETED',
-  FAILED = 'FAILED'
+export interface RebuildState {
+  /** Collections and their completed indexes */
+  completed: Record<string, string[]>;
 }
 
 /**
- * Persistent state information
+ * Statistics for a single index
  */
-export interface StateInfo {
-  /** Current state of the operation */
-  state: ReindexState;
-  /** Timestamp when state was last updated */
-  timestamp: Date;
-  /** Database name */
-  database: string;
-  /** Collection name */
-  collection: string;
-  /** Index specification */
-  indexSpec: IndexSpecification;
-  /** Name of the temporary covering index */
-  coveringIndexName?: string;
-  /** Name of the original index to be replaced */
-  originalIndexName?: string;
-  /** Error message if operation failed */
-  error?: string;
-  /** Cluster node identifier */
-  nodeId?: string;
+export interface IndexStat {
+  /** Index name */
+  name: string;
+  /** Index size in bytes */
+  size: number;
 }
 
 /**
- * Result of a reindex operation
+ * Index document from MongoDB
  */
-export interface ReindexResult {
-  /** Whether the operation was successful */
-  success: boolean;
-  /** Final state */
-  state: ReindexState;
-  /** Time taken in milliseconds */
-  durationMs: number;
-  /** Error message if failed */
-  error?: string;
-  /** Additional details */
-  details?: string;
-}
-
-/**
- * Index information from MongoDB
- */
-export interface IndexInfo {
+export interface IndexDocument {
   /** Index name */
   name: string;
   /** Index key specification */
-  key: Document;
+  key: Record<string, any>;
   /** Index version */
   v?: number;
-  /** Additional index properties */
+  /** Other properties */
   [key: string]: any;
 }
+
+/**
+ * Performance log for a single index rebuild
+ */
+export interface IndexLog {
+  /** Start time of index rebuild */
+  startTime: Date;
+  /** Total time in seconds */
+  timeSeconds: number;
+  /** Initial size in MB */
+  initialSizeMb: number;
+  /** Final size in MB */
+  finalSizeMb: number;
+}
+
+/**
+ * Performance log for a collection rebuild
+ */
+export interface CollectionLog {
+  /** Start time of collection rebuild */
+  startTime: Date;
+  /** Total time in seconds */
+  totalTimeSeconds: number;
+  /** Initial total size in MB */
+  initialSizeMb: number;
+  /** Final total size in MB */
+  finalSizeMb: number;
+  /** Space reclaimed in MB */
+  reclaimedMb: number;
+  /** Logs for individual indexes */
+  indexes: Record<string, IndexLog>;
+}
+
+/**
+ * Performance log for entire database rebuild
+ */
+export interface DatabaseLog {
+  /** Cluster name */
+  clusterName: string;
+  /** Database name */
+  dbName: string;
+  /** Start time ISO string */
+  startTime: string;
+  /** Total time in seconds */
+  totalTimeSeconds: number;
+  /** Total initial size in MB */
+  totalInitialSizeMb: number;
+  /** Total final size in MB */
+  totalFinalSizeMb: number;
+  /** Total space reclaimed in MB */
+  totalReclaimedMb: number;
+  /** Logs for individual collections */
+  collections: Record<string, CollectionLog>;
+  /** Error message if any */
+  error: string | null;
+}
+
+/**
+ * Information about an orphaned index
+ */
+export interface OrphanedIndex {
+  /** Collection name */
+  collectionName: string;
+  /** Index name */
+  indexName: string;
+}
+
+/**
+ * File paths for state and logs
+ */
+export interface RebuildPaths {
+  /** State file path */
+  stateFile: string;
+  /** Backup file path */
+  backupFile: string;
+  /** Log file path */
+  logFile: string;
+}
+
+/**
+ * Collection information with statistics
+ */
+export interface CollectionInfo {
+  /** Collection name */
+  name: string;
+  /** Index statistics */
+  indexStats: IndexStat[];
+  /** Total index size */
+  totalIndexSize: number;
+}
+
+/**
+ * Valid MongoDB index options
+ */
+export const VALID_INDEX_OPTIONS = [
+  'unique',
+  'expireAfterSeconds',
+  'partialFilterExpression',
+  'sparse',
+  'storageEngine',
+  'weights',
+  'default_language',
+  'language_override',
+  'textIndexVersion',
+  '2dsphereIndexVersion',
+  'bits',
+  'min',
+  'max',
+  'bucketSize'
+] as const;

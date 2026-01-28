@@ -1,8 +1,13 @@
 #!/usr/bin/env node
 
 import { Command } from 'commander';
-import { MongoDBReindexer } from './lib/reindexer';
-import { ReindexerConfig } from './types';
+import { MongoClient } from 'mongodb';
+import { rebuildIndexes } from './index';
+import { RebuildConfig } from './types';
+import * as dotenv from 'dotenv';
+
+// Load environment variables
+dotenv.config();
 
 // Import package.json to get version
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -17,102 +22,156 @@ program
 
 program
   .command('rebuild')
-  .description('Rebuild an index with zero downtime')
-  .requiredOption('-u, --uri <uri>', 'MongoDB connection URI')
+  .description('Rebuild indexes for a database with zero downtime')
+  .requiredOption('-u, --uri <uri>', 'MongoDB connection URI (or use MONGODB_URI env var)')
   .requiredOption('-d, --database <name>', 'Database name')
-  .requiredOption('-c, --collection <name>', 'Collection name')
-  .requiredOption('-i, --index <spec>', 'Index specification as JSON (e.g., \'{"field": 1}\')')
-  .option('-o, --options <options>', 'Index options as JSON (e.g., \'{"unique": true}\')')
-  .option('-s, --state-file <path>', 'Path to state file for resuming operations')
-  .option('-v, --verbose', 'Enable verbose logging', false)
-  .option('--max-retries <number>', 'Maximum verification retries', '10')
-  .option('--retry-delay <ms>', 'Verification retry delay in milliseconds', '2000')
+  .option('--log-dir <dir>', 'Directory for performance logs', 'rebuild_logs')
+  .option('--runtime-dir <dir>', 'Directory for runtime state files', '.rebuild_runtime')
+  .option('--cover-suffix <suffix>', 'Suffix for covering indexes', '_cover_temp')
+  .option('--cheap-field <field>', 'Field name for covering indexes', '_rebuild_cover_field_')
+  .option('--no-safe-run', 'Disable interactive prompts (dangerous!)')
+  .option('--specified-collections <collections>', 'Comma-separated list of collections to process')
+  .option('--ignored-collections <collections>', 'Comma-separated list of collections to ignore')
+  .option('--ignored-indexes <indexes>', 'Comma-separated list of indexes to ignore')
+  .option('--no-performance-logging', 'Disable performance logging')
   .action(async (options) => {
+    let client: MongoClient | null = null;
+    
     try {
-      // Parse index specification
-      let indexSpec: any;
-      try {
-        indexSpec = JSON.parse(options.index);
-      } catch (error) {
-        console.error('Error: Invalid index specification JSON');
+      // Get URI from option or environment
+      const uri = options.uri || process.env.MONGODB_URI;
+      if (!uri) {
+        console.error('Error: MongoDB URI is required. Provide via --uri or MONGODB_URI env var.');
         process.exit(1);
       }
-
-      // Parse index options if provided
-      let indexOptions: any = {};
-      if (options.options) {
-        try {
-          indexOptions = JSON.parse(options.options);
-        } catch (error) {
-          console.error('Error: Invalid index options JSON');
-          process.exit(1);
-        }
-      }
-
+      
       // Build configuration
-      const config: ReindexerConfig = {
-        uri: options.uri,
-        database: options.database,
-        collection: options.collection,
-        indexSpec,
-        indexOptions,
-        verbose: options.verbose,
-        maxVerificationRetries: parseInt(options.maxRetries, 10),
-        verificationRetryDelayMs: parseInt(options.retryDelay, 10)
+      const config: RebuildConfig = {
+        dbName: options.database,
+        logDir: options.logDir,
+        runtimeDir: options.runtimeDir,
+        coverSuffix: options.coverSuffix,
+        cheapSuffixField: options.cheapField,
+        safeRun: options.safeRun,
+        performanceLogging: {
+          enabled: options.performanceLogging
+        }
       };
-
-      if (options.stateFile) {
-        config.stateFilePath = options.stateFile;
+      
+      if (options.specifiedCollections) {
+        config.specifiedCollections = options.specifiedCollections.split(',').map((s: string) => s.trim());
       }
-
-      // Execute reindex
-      const reindexer = new MongoDBReindexer(config);
-      const result = await reindexer.reindex();
-
-      if (result.success) {
-        console.log('\n✓ Reindex completed successfully');
-        process.exit(0);
-      } else {
-        console.error('\n✗ Reindex failed:', result.error);
-        process.exit(1);
+      
+      if (options.ignoredCollections) {
+        config.ignoredCollections = options.ignoredCollections.split(',').map((s: string) => s.trim());
       }
+      
+      if (options.ignoredIndexes) {
+        config.ignoredIndexes = options.ignoredIndexes.split(',').map((s: string) => s.trim());
+      }
+      
+      // Connect to MongoDB
+      console.log('Connecting to MongoDB...');
+      client = new MongoClient(uri);
+      await client.connect();
+      console.log('✅ Connected to MongoDB');
+      
+      // Get the database
+      const db = client.db(config.dbName);
+      
+      // Run the rebuild
+      await rebuildIndexes(db, config);
+      
+      console.log('\n✅ Rebuild completed successfully');
+      process.exit(0);
+      
     } catch (error) {
       console.error('Fatal error:', error instanceof Error ? error.message : String(error));
+      if (error instanceof Error && error.stack) {
+        console.error('Stack trace:', error.stack);
+      }
       process.exit(1);
+    } finally {
+      if (client) {
+        await client.close();
+        console.log('MongoDB connection closed');
+      }
     }
   });
 
 program
   .command('cleanup')
   .description('Cleanup orphan indexes from failed operations')
-  .requiredOption('-u, --uri <uri>', 'MongoDB connection URI')
+  .requiredOption('-u, --uri <uri>', 'MongoDB connection URI (or use MONGODB_URI env var)')
   .requiredOption('-d, --database <name>', 'Database name')
-  .requiredOption('-c, --collection <name>', 'Collection name')
-  .option('-v, --verbose', 'Enable verbose logging', false)
+  .option('--cover-suffix <suffix>', 'Suffix for covering indexes', '_cover_temp')
   .action(async (options) => {
+    let client: MongoClient | null = null;
+    
     try {
-      const config: ReindexerConfig = {
-        uri: options.uri,
-        database: options.database,
-        collection: options.collection,
-        indexSpec: {}, // Not used for cleanup
-        verbose: options.verbose
-      };
-
-      const reindexer = new MongoDBReindexer(config);
-      const orphans = await reindexer.cleanupOrphans();
-
-      if (orphans.length > 0) {
-        console.log(`✓ Cleaned up ${orphans.length} orphan index(es):`);
-        orphans.forEach(name => console.log(`  - ${name}`));
-      } else {
-        console.log('✓ No orphan indexes found');
+      // Get URI from option or environment
+      const uri = options.uri || process.env.MONGODB_URI;
+      if (!uri) {
+        console.error('Error: MongoDB URI is required. Provide via --uri or MONGODB_URI env var.');
+        process.exit(1);
       }
-
+      
+      // Connect to MongoDB
+      console.log('Connecting to MongoDB...');
+      client = new MongoClient(uri);
+      await client.connect();
+      console.log('✅ Connected to MongoDB');
+      
+      const db = client.db(options.database);
+      const coverSuffix = options.coverSuffix;
+      
+      // Find orphaned indexes
+      console.log("Checking for orphaned temporary indexes...");
+      const orphanedIndexes: { collectionName: string; indexName: string }[] = [];
+      const collectionsList = await db.listCollections().toArray();
+      const collectionNames = collectionsList.map(c => c.name);
+      
+      for (const collName of collectionNames) {
+        const collection = db.collection(collName);
+        const indexes = await collection.indexes();
+        const orphansInColl = indexes.filter(idx => idx.name && idx.name.endsWith(coverSuffix));
+        
+        if (orphansInColl.length > 0) {
+          orphansInColl.forEach(o => {
+            if (o.name) {
+              orphanedIndexes.push({ collectionName: collName, indexName: o.name });
+            }
+          });
+        }
+      }
+      
+      if (orphanedIndexes.length === 0) {
+        console.log('✅ No orphan indexes found');
+        process.exit(0);
+      }
+      
+      console.log(`Found ${orphanedIndexes.length} orphan index(es):`);
+      orphanedIndexes.forEach(o => 
+        console.log(`  - Collection: "${o.collectionName}", Index: "${o.indexName}"`)
+      );
+      
+      // Clean up
+      for (const orphan of orphanedIndexes) {
+        await db.collection(orphan.collectionName).dropIndex(orphan.indexName);
+        console.log(`  ✅ Dropped: "${orphan.indexName}" from "${orphan.collectionName}"`);
+      }
+      
+      console.log(`✅ Cleaned up ${orphanedIndexes.length} orphan index(es)`);
       process.exit(0);
+      
     } catch (error) {
       console.error('Fatal error:', error instanceof Error ? error.message : String(error));
       process.exit(1);
+    } finally {
+      if (client) {
+        await client.close();
+        console.log('MongoDB connection closed');
+      }
     }
   });
 
