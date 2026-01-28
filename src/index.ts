@@ -114,10 +114,7 @@ async function cleanupOrphanedIndexes(db: Db, config: RebuildConfig): Promise<vo
     const [responseChar, responseWord] = await promptUser(
       "\nProceed with cleanup? (y/n): ",
       ['yes', 'no'],
-      [
-        { value: 'yes', description: 'Drop all orphaned temporary indexes' },
-        { value: 'no', description: 'Abort cleanup operation and exit' }
-      ]
+      'cleanup'
     );
     console.log(`User chose: [${responseWord}].`);
     if (responseChar === 'n') {
@@ -188,12 +185,7 @@ async function rebuildCollectionIndexes(
     const [responseChar, responseWord] = await promptUser(
       "\nProceed with these indexes? (yes/no/specify/skip collection) [y/n/s/b]: ",
       ['yes', 'no', 'specify', 'skip'],
-      [
-        { value: 'yes', description: 'Rebuild all listed indexes in this collection' },
-        { value: 'no', description: 'Abort the entire rebuild operation' },
-        { value: 'specify', description: 'Interactively choose which indexes to rebuild' },
-        { value: 'skip', description: 'Skip this collection and move to the next one' }
-      ]
+      'indexes'
     );
     console.log(`User chose: [${responseWord}].`);
     
@@ -217,10 +209,7 @@ async function rebuildCollectionIndexes(
       const [continueWithIndex, continueWord] = await promptUser(
         `  -> Process index "${originalName}"? (y/n): `,
         ['yes', 'no'],
-        [
-          { value: 'yes', description: 'Rebuild this index using Cover-Swap-Cleanup' },
-          { value: 'no', description: 'Skip this index and continue to the next one' }
-        ]
+        'index-specify'
       );
       console.log(`  User chose: [${continueWord}].`);
       
@@ -466,11 +455,7 @@ export async function rebuildIndexes(db: Db, config: RebuildConfig): Promise<Dat
       const [responseChar, responseWord] = await promptUser(
         "\nProceed with these collections? (yes/no/specify) [y/n/s]: ",
         ['yes', 'no', 'specify'],
-        [
-          { value: 'yes', description: 'Process all listed collections' },
-          { value: 'no', description: 'Abort the entire operation' },
-          { value: 'specify', description: 'Interactively choose which collections to process' }
-        ]
+        'collections'
       );
       console.log(`User chose: [${responseWord}].`);
       
@@ -489,11 +474,7 @@ export async function rebuildIndexes(db: Db, config: RebuildConfig): Promise<Dat
         const [continueWithColl, continueWord] = await promptUser(
           `\nProcess collection "${collectionInfo.name}"? (y/n/end): `,
           ['yes', 'no', 'end'],
-          [
-            { value: 'yes', description: 'Process this collection and its indexes' },
-            { value: 'no', description: 'Skip this collection and continue to next' },
-            { value: 'end', description: 'Stop processing and exit (save progress)' }
-          ]
+          'collection-specify'
         );
         console.log(`User chose: [${continueWord}].`);
         

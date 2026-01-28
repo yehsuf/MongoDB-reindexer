@@ -1,6 +1,7 @@
 import * as readline from 'readline';
 import { MongoClient, Db } from 'mongodb';
 import * as fs from 'fs';
+import * as path from 'path';
 
 /**
  * Get cluster name from MongoDB connection
@@ -62,19 +63,61 @@ export interface PromptOption {
   value: string;
   /** Short description of what this option does */
   description: string;
+  /** Optional detailed explanation */
+  details?: string;
+}
+
+/**
+ * Help file structure
+ */
+export interface HelpFile {
+  /** Unique identifier */
+  id: string;
+  /** The question text */
+  question: string;
+  /** Available options */
+  options: Array<{
+    value: string;
+    shortcut: string;
+    description: string;
+    details?: string;
+  }>;
+  /** Optional context information */
+  context?: string;
+}
+
+/**
+ * Load help file from JSON
+ */
+function loadHelpFile(helpFileId: string): PromptOption[] | null {
+  try {
+    const helpPath = path.join(__dirname, '..', 'help', 'prompts', `${helpFileId}.json`);
+    if (fs.existsSync(helpPath)) {
+      const content = fs.readFileSync(helpPath, 'utf8');
+      const helpFile: HelpFile = JSON.parse(content);
+      return helpFile.options.map(opt => ({
+        value: opt.value,
+        description: opt.description,
+        details: opt.details
+      }));
+    }
+  } catch (e) {
+    console.warn(`⚠️ Could not load help file: ${helpFileId}`);
+  }
+  return null;
 }
 
 /**
  * Prompt user for input with validation and help support
  * @param question Question to ask
  * @param validAnswers Valid answer options
- * @param helpText Optional array of help descriptions for each option
+ * @param helpFileIdOrOptions Help file ID (string) or inline help options (array)
  * @returns Tuple of [first character, full word]
  */
 export function promptUser(
   question: string, 
   validAnswers: string[],
-  helpText?: PromptOption[]
+  helpFileIdOrOptions?: string | PromptOption[]
 ): Promise<[string, string]> {
   return new Promise((resolve) => {
     const rl = readline.createInterface({
@@ -82,12 +125,23 @@ export function promptUser(
       output: process.stdout
     });
 
+    // Load help text
+    let helpText: PromptOption[] | null = null;
+    if (typeof helpFileIdOrOptions === 'string') {
+      helpText = loadHelpFile(helpFileIdOrOptions);
+    } else if (Array.isArray(helpFileIdOrOptions)) {
+      helpText = helpFileIdOrOptions;
+    }
+
     const showHelp = (): void => {
       console.log('\n📖 Available options:');
       if (helpText && helpText.length > 0) {
         helpText.forEach(option => {
           const shortcut = option.value[0];
           console.log(`  ${option.value} (${shortcut}) - ${option.description}`);
+          if (option.details) {
+            console.log(`    ${option.details}`);
+          }
         });
       } else {
         validAnswers.forEach(answer => {

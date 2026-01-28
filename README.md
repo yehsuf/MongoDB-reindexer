@@ -202,6 +202,27 @@ When `safeRun: true` (default), the tool prompts for confirmation:
 - Before cleanup operations
 - Supports answers: yes/no/specify/skip/end
 
+**Built-in Help System:**
+
+At any interactive prompt, type `help`, `h`, or `?` to see detailed information about each option:
+
+```
+Proceed with these collections? (yes/no/specify) [y/n/s]: ?
+
+📖 Available options:
+  yes (y) - Process all listed collections
+    Automatically processes all non-unique indexes in each collection shown above
+  no (n) - Abort the entire operation
+    Exits the rebuild process completely. Progress up to this point is saved in state file.
+  specify (s) - Interactively choose which collections to process
+    Shows a prompt for each collection, allowing you to select which ones to rebuild
+  help/? - Show this help message
+
+Proceed with these collections? (yes/no/specify) [y/n/s]: 
+```
+
+Help text is loaded from JSON configuration files in `help/prompts/`. See [help/README.md](help/README.md) for details on the help file format.
+
 ### Performance Logging
 
 Detailed performance metrics are saved to log files:
@@ -271,6 +292,51 @@ interface RebuildConfig {
 - `_id_` indexes are always skipped (cannot be rebuilt)
 - Unique indexes are always skipped (requires special handling)
 - Already completed indexes are skipped (from state file)
+
+### Help System
+
+The tool includes a comprehensive help system for interactive prompts. Help text is stored in JSON configuration files for easy maintenance and customization.
+
+**Directory Structure:**
+```
+help/
+├── prompts/           # Help files for each prompt type
+│   ├── cleanup.json
+│   ├── collections.json
+│   ├── collection-specify.json
+│   ├── indexes.json
+│   └── index-specify.json
+└── README.md          # Help file format documentation
+```
+
+**Using Help:**
+- Type `help`, `h`, or `?` at any interactive prompt
+- Help displays all available options with descriptions
+- Shows extended details for complex choices
+- Re-prompts automatically after showing help
+
+**Customizing Help:**
+
+Edit the JSON files in `help/prompts/` to customize help text. Each file follows this format:
+
+```json
+{
+  "id": "unique-identifier",
+  "question": "The prompt question",
+  "options": [
+    {
+      "value": "option-name",
+      "shortcut": "letter",
+      "description": "Brief description",
+      "details": "Extended explanation (optional)"
+    }
+  ],
+  "context": "Additional context (optional)"
+}
+```
+
+See [help/README.md](help/README.md) for complete documentation on the help file format.
+
 
 ## Requirements
 
