@@ -12,7 +12,8 @@
     "dev": "tsc --watch",
     "prepare": "npm run build",
     "lint": "eslint src --ext .ts",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "test": "node test/smoke-test.js"
   },
   "keywords": [
     "mongodb",

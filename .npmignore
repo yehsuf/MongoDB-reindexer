@@ -1,0 +1,36 @@
+# Source files (only dist should be published)
+src/
+tsconfig.json
+.eslintrc.json
+
+# Tests
+test/
+*.test.ts
+*.test.js
+
+# Examples
+examples/
+
+# Development files
+.git/
+.gitignore
+*.log
+.env
+.env.*
+
+# Build artifacts
+*.tsbuildinfo
+.nyc_output
+coverage
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# CI/CD
+.github/
+
+# State files
+.reindex-state-*.json
