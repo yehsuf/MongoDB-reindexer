@@ -15,6 +15,7 @@ Universal zero-downtime MongoDB index rebuilding using the **Cover-Swap-Cleanup*
 - 📦 **Dual Mode**: Use as CLI tool or library in your application
 - 🔒 **Strict TypeScript**: Full type safety and robust error handling
 - 🌐 **Native MongoDB Driver**: Uses the official MongoDB Node.js driver 6.x
+- 🌍 **Internationalization**: Multi-language support with locale system
 
 ## Installation
 
@@ -343,6 +344,53 @@ See [help/README.md](help/README.md) for complete documentation on the help file
 - Node.js >= 18.0.0
 - MongoDB server >= 3.6 (any version supported by mongodb driver 6.x)
 - Network access to MongoDB cluster
+
+## Internationalization (i18n)
+
+MongoDB Reindexer supports multiple languages through a localization system.
+
+### Current Languages
+
+- **English (en)** - Default locale
+
+### Setting Locale
+
+Use the `LOCALE` environment variable:
+
+```bash
+LOCALE=en mongodb-reindex rebuild --database mydb
+```
+
+Or programmatically:
+
+```typescript
+import { setLocale } from 'mongodb-reindexer/dist/utils';
+
+setLocale('en');
+```
+
+### Adding New Languages
+
+1. **Create locale directory:**
+   ```bash
+   mkdir -p locales/es/prompts
+   ```
+
+2. **Copy and translate files:**
+   ```bash
+   cp locales/en/messages.json locales/es/messages.json
+   cp locales/en/prompts/*.json locales/es/prompts/
+   ```
+
+3. **Update configuration:**
+   Edit `locales/config.json` to add your locale to `supportedLocales`
+
+4. **Test:**
+   ```bash
+   LOCALE=es npm start rebuild --database mydb
+   ```
+
+See [locales/README.md](locales/README.md) for complete documentation on the localization system, translation guidelines, and file formats.
 
 ## Development
 
