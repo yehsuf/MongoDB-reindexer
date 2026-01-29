@@ -14,7 +14,8 @@
     "prepare": "npm run build",
     "lint": "eslint src --ext .ts",
     "clean": "rm -rf dist",
-    "test": "node test/smoke-test.js"
+    "test": "node test/smoke-test.js",
+    "validate:structure": "node scripts/validate-structure.js"
   },
   "keywords": [
     "mongodb",

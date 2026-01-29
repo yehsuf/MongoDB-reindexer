@@ -22,6 +22,25 @@ Thank you for your interest in contributing to MongoDB Reindexer!
 
 ## Development Workflow
 
+### File Organization
+
+**IMPORTANT:** Follow the conventions in [CONVENTIONS.md](CONVENTIONS.md):
+
+- **Internal Documentation** goes in `.github/internal/` (not committed/distributed)
+  - Implementation summaries
+  - Development notes
+  - Architecture decision records
+  
+- **Public Documentation** stays in root directory (user-facing)
+  - README.md
+  - CONTRIBUTING.md
+  - LICENSE
+
+Run validation before committing:
+```bash
+npm run validate:structure
+```
+
 ### Building
 
 - `npm run build` - Compile TypeScript to JavaScript
@@ -32,6 +51,7 @@ Thank you for your interest in contributing to MongoDB Reindexer!
 
 - `npm test` - Run smoke tests
 - `npm run lint` - Run ESLint
+- `npm run validate:structure` - Validate file organization (run before commits)
 
 ### Code Style
 
@@ -45,10 +65,12 @@ Thank you for your interest in contributing to MongoDB Reindexer!
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
 3. Make your changes
-4. Run tests and linting (`npm test && npm run lint`)
-5. Commit your changes (`git commit -m 'Add amazing feature'`)
-6. Push to the branch (`git push origin feature/amazing-feature`)
-7. Open a Pull Request
+4. Follow file organization conventions (see [CONVENTIONS.md](CONVENTIONS.md))
+5. Run validation (`npm run validate:structure`)
+6. Run tests and linting (`npm test && npm run lint`)
+7. Commit your changes (`git commit -m 'Add amazing feature'`)
+8. Push to the branch (`git push origin feature/amazing-feature`)
+9. Open a Pull Request
 
 ## Commit Messages
 

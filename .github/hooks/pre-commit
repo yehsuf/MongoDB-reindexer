@@ -1,0 +1,32 @@
+#!/bin/sh
+
+#
+# Pre-commit hook template for MongoDB Reindexer
+#
+# This hook validates project structure before allowing commits.
+# To enable this hook:
+#   cp .github/hooks/pre-commit .git/hooks/pre-commit
+#   chmod +x .git/hooks/pre-commit
+#
+
+echo "Running project structure validation..."
+
+# Run the validation script
+npm run validate:structure --silent
+
+# Capture exit code
+VALIDATION_EXIT_CODE=$?
+
+if [ $VALIDATION_EXIT_CODE -ne 0 ]; then
+    echo ""
+    echo "❌ Pre-commit validation FAILED!"
+    echo "Please fix the errors above before committing."
+    echo ""
+    echo "If you need to bypass this check (not recommended):"
+    echo "  git commit --no-verify"
+    echo ""
+    exit 1
+fi
+
+echo "✅ Pre-commit validation passed!"
+exit 0

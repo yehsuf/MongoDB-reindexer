@@ -140,3 +140,6 @@ vite.config.ts.timestamp-*
 
 # Reindexer state files
 .reindex-state-*.json
+
+# Internal documentation (not for public distribution)
+.github/internal/

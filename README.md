@@ -627,7 +627,15 @@ MIT
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit issues and pull requests.
+Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+**Important for Contributors:**
+- Follow file organization rules in [CONVENTIONS.md](CONVENTIONS.md)
+- Internal docs go in `.github/internal/` (excluded from git/npm)
+- Run `npm run validate:structure` before committing
+- Optional: Install pre-commit hook with `bash scripts/setup-hooks.sh`
+
+For detailed development setup, workflow, and standards, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Support
 
