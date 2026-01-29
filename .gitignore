@@ -143,3 +143,5 @@ vite.config.ts.timestamp-*
 
 # Internal documentation (not for public distribution)
 .github/internal/
+.agent_memory/
+!.agent_memory/.keep

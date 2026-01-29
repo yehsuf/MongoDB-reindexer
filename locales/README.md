@@ -108,7 +108,7 @@ Interactive prompt help files follow this schema:
 The locale system is integrated into the `promptUser` function:
 
 ```typescript
-import { promptUser } from './utils';
+import { promptUser } from './prompts';
 
 // Loads help from locales/{locale}/prompts/cleanup.json
 const [choice, word] = await promptUser(
@@ -121,7 +121,7 @@ const [choice, word] = await promptUser(
 Messages are loaded via the i18n utility:
 
 ```typescript
-import { t } from './utils';
+import { t } from './i18n';
 
 console.log(t('messages.starting_rebuild', { database: 'mydb' }));
 // Output: ### Starting UNIVERSAL index rebuild for database: "mydb" ###

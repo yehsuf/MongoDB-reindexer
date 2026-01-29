@@ -15,7 +15,8 @@
     "lint": "eslint src --ext .ts",
     "clean": "rm -rf dist",
     "test": "node test/smoke-test.js",
-    "validate:structure": "node scripts/validate-structure.js"
+    "validate:structure": "node scripts/validate-structure.js",
+    "rebuild-npm": "rm -rf node_modules package-lock.json && npm install"
   },
   "keywords": [
     "mongodb",
