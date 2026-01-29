@@ -4,6 +4,141 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 /**
+ * Locale configuration interface
+ */
+interface LocaleConfig {
+  defaultLocale: string;
+  supportedLocales: string[];
+  fallbackLocale: string;
+}
+
+/**
+ * Get current locale from environment or default
+ */
+function getCurrentLocale(): string {
+  const envLocale = process.env.LOCALE || process.env.LANG?.split('.')[0]?.split('_')[0];
+  
+  try {
+    const configPath = path.join(__dirname, '..', 'locales', 'config.json');
+    const config: LocaleConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    
+    if (envLocale && config.supportedLocales.includes(envLocale)) {
+      return envLocale;
+    }
+    
+    return config.defaultLocale;
+  } catch {
+    return 'en'; // Fallback to English
+  }
+}
+
+/**
+ * Current locale (cached)
+ */
+let currentLocale: string | null = null;
+
+/**
+ * Get or initialize current locale
+ */
+function getLocale(): string {
+  if (!currentLocale) {
+    currentLocale = getCurrentLocale();
+  }
+  return currentLocale;
+}
+
+/**
+ * Messages cache
+ */
+let messagesCache: Record<string, any> = {};
+
+/**
+ * Load messages for current locale
+ */
+function loadMessages(locale: string): Record<string, any> {
+  if (messagesCache[locale]) {
+    return messagesCache[locale];
+  }
+  
+  try {
+    const messagesPath = path.join(__dirname, '..', 'locales', locale, 'messages.json');
+    if (fs.existsSync(messagesPath)) {
+      messagesCache[locale] = JSON.parse(fs.readFileSync(messagesPath, 'utf8'));
+      return messagesCache[locale];
+    }
+  } catch {
+    // Fallback to English if locale not found
+    if (locale !== 'en') {
+      return loadMessages('en');
+    }
+  }
+  
+  return {};
+}
+
+/**
+ * Translate a message key with optional parameters
+ * @param key Message key (e.g., 'common.help_trigger')
+ * @param params Optional parameters to replace in message
+ * @returns Translated message
+ */
+export function t(key: string, params?: Record<string, any>): string {
+  const locale = getLocale();
+  const messages = loadMessages(locale);
+  
+  // Navigate through nested keys
+  const keys = key.split('.');
+  let value: any = messages;
+  
+  for (const k of keys) {
+    if (value && typeof value === 'object') {
+      value = value[k];
+    } else {
+      value = undefined;
+      break;
+    }
+  }
+  
+  // If not found, try fallback locale
+  if (value === undefined && locale !== 'en') {
+    const fallbackMessages = loadMessages('en');
+    value = fallbackMessages;
+    for (const k of keys) {
+      if (value && typeof value === 'object') {
+        value = value[k];
+      } else {
+        value = key; // Return key if not found
+        break;
+      }
+    }
+  }
+  
+  // Return key if translation not found
+  if (typeof value !== 'string') {
+    return key;
+  }
+  
+  // Replace parameters
+  if (params) {
+    let result = value;
+    for (const [paramKey, paramValue] of Object.entries(params)) {
+      result = result.replace(new RegExp(`\\{${paramKey}\\}`, 'g'), String(paramValue));
+    }
+    return result;
+  }
+  
+  return value;
+}
+
+/**
+ * Set locale programmatically
+ * @param locale Locale code (e.g., 'en', 'es')
+ */
+export function setLocale(locale: string): void {
+  currentLocale = locale;
+}
+
+/**
  * Get cluster name from MongoDB connection
  */
 export function getClusterName(client: MongoClient): string {
@@ -18,7 +153,7 @@ export function getClusterName(client: MongoClient): string {
     }
     
     return 'unknown-cluster';
-  } catch (e) {
+  } catch {
     return 'unknown-cluster';
   }
 }
@@ -33,7 +168,7 @@ export async function getReplicaSetName(db: Db): Promise<string> {
       return hello.setName.replace(/[^a-zA-Z0-9_-]/g, '');
     }
     return 'unknown-cluster';
-  } catch (e) {
+  } catch {
     return 'unknown-cluster';
   }
 }
@@ -87,11 +222,25 @@ export interface HelpFile {
 }
 
 /**
- * Load help file from JSON
+ * Load help file from JSON (locale-aware)
  */
 function loadHelpFile(helpFileId: string): PromptOption[] | null {
+  const locale = getLocale();
+  
   try {
-    const helpPath = path.join(__dirname, '..', 'help', 'prompts', `${helpFileId}.json`);
+    // Try locale-specific path first
+    let helpPath = path.join(__dirname, '..', 'locales', locale, 'prompts', `${helpFileId}.json`);
+    
+    // Fallback to old help/ directory for backward compatibility
+    if (!fs.existsSync(helpPath)) {
+      helpPath = path.join(__dirname, '..', 'help', 'prompts', `${helpFileId}.json`);
+    }
+    
+    // Fallback to English if locale file doesn't exist
+    if (!fs.existsSync(helpPath) && locale !== 'en') {
+      helpPath = path.join(__dirname, '..', 'locales', 'en', 'prompts', `${helpFileId}.json`);
+    }
+    
     if (fs.existsSync(helpPath)) {
       const content = fs.readFileSync(helpPath, 'utf8');
       const helpFile: HelpFile = JSON.parse(content);
@@ -101,8 +250,8 @@ function loadHelpFile(helpFileId: string): PromptOption[] | null {
         details: opt.details
       }));
     }
-  } catch (e) {
-    console.warn(`⚠️ Could not load help file: ${helpFileId}`);
+  } catch {
+    console.warn(t('errors.could_not_read_file', { file: helpFileId }));
   }
   return null;
 }
@@ -134,7 +283,7 @@ export function promptUser(
     }
 
     const showHelp = (): void => {
-      console.log('\n📖 Available options:');
+      console.log(`\n${t('common.available_options')}`);
       if (helpText && helpText.length > 0) {
         helpText.forEach(option => {
           const shortcut = option.value[0];
@@ -148,7 +297,7 @@ export function promptUser(
           console.log(`  ${answer} (${answer[0]})`);
         });
       }
-      console.log(`  help/? - Show this help message\n`);
+      console.log(`  ${t('common.help_command')}\n`);
     };
 
     const ask = (): void => {
@@ -178,8 +327,8 @@ export function promptUser(
           }
         }
         
-        console.log(`Invalid input. Please enter one of: ${validAnswers.join(', ')}`);
-        console.log(`Type 'help' or '?' for more information.`);
+        console.log(t('common.invalid_input', { options: validAnswers.join(', ') }));
+        console.log(t('common.help_trigger'));
         ask();
       });
     };
@@ -206,7 +355,7 @@ export function readJsonFile<T>(filePath: string, defaultValue: T): T {
       const content = fs.readFileSync(filePath, 'utf8');
       return JSON.parse(content);
     }
-  } catch (e) {
+  } catch {
     console.warn(`⚠️ Could not read file: ${filePath}. Using default.`);
   }
   return defaultValue;

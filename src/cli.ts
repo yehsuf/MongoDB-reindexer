@@ -5,13 +5,14 @@ import { MongoClient } from 'mongodb';
 import { rebuildIndexes } from './index';
 import { RebuildConfig } from './types';
 import * as dotenv from 'dotenv';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 
 // Load environment variables
 dotenv.config();
 
 // Import package.json to get version
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const pkg = require('../package.json');
+const pkg = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf8'));
 
 const program = new Command();
 
