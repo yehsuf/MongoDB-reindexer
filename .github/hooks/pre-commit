@@ -5,14 +5,26 @@
 #
 # This hook validates project structure before allowing commits.
 # To enable this hook:
-#   cp .github/hooks/pre-commit .git/hooks/pre-commit
-#   chmod +x .git/hooks/pre-commit
+#   bash scripts/setup-hooks.sh
 #
 
 echo "Running project structure validation..."
 
+# Check if node and npm are available
+if ! command -v node >/dev/null 2>&1; then
+    echo "⚠️  Warning: Node.js not found in PATH"
+    echo "Skipping validation (install Node.js to enable)"
+    exit 0
+fi
+
+if ! command -v npm >/dev/null 2>&1; then
+    echo "⚠️  Warning: npm not found in PATH"
+    echo "Skipping validation (install npm to enable)"
+    exit 0
+fi
+
 # Run the validation script
-npm run validate:structure --silent
+npm run validate:structure
 
 # Capture exit code
 VALIDATION_EXIT_CODE=$?

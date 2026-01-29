@@ -5,7 +5,6 @@ echo "Testing MongoDB Reindexer Enforcement System"
 echo "========================================="
 echo ""
 
-cd /home/runner/work/MongoDB-reindexer/MongoDB-reindexer
 
 echo "✅ Test 1: Validation passes with current structure"
 npm run validate:structure > /tmp/test1.log 2>&1

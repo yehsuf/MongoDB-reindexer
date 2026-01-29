@@ -142,4 +142,6 @@ vite.config.ts.timestamp-*
 .reindex-state-*.json
 
 # Internal documentation (not for public distribution)
+# Note: Only .github/internal/README.md is tracked to document the directory
 .github/internal/
+!.github/internal/README.md

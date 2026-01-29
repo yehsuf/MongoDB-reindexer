@@ -8,6 +8,7 @@
 
 HOOKS_DIR=".git/hooks"
 HOOK_TEMPLATE=".github/hooks/pre-commit"
+HOOK_DEST="$HOOKS_DIR/pre-commit"
 
 echo "🔧 Setting up Git hooks..."
 
@@ -23,10 +24,26 @@ if [ ! -f "$HOOK_TEMPLATE" ]; then
     exit 1
 fi
 
+# Check if hook already exists
+if [ -f "$HOOK_DEST" ]; then
+    echo "⚠️  Warning: Pre-commit hook already exists"
+    echo ""
+    read -p "Do you want to backup and replace it? (y/n): " -n 1 -r
+    echo ""
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "❌ Installation cancelled"
+        exit 1
+    fi
+    # Backup existing hook
+    BACKUP="$HOOK_DEST.backup.$(date +%s)"
+    cp "$HOOK_DEST" "$BACKUP"
+    echo "✅ Backed up existing hook to: $BACKUP"
+fi
+
 # Copy and enable pre-commit hook
 echo "Installing pre-commit hook..."
-cp "$HOOK_TEMPLATE" "$HOOKS_DIR/pre-commit"
-chmod +x "$HOOKS_DIR/pre-commit"
+cp "$HOOK_TEMPLATE" "$HOOK_DEST"
+chmod +x "$HOOK_DEST"
 
 echo "✅ Pre-commit hook installed successfully!"
 echo ""
