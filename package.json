@@ -16,7 +16,8 @@
     "clean": "rm -rf dist",
     "test": "node test/smoke-test.js",
     "validate:structure": "node scripts/validate-structure.js",
-    "demo:enforcement": "bash scripts/demo-enforcement.sh"
+    "demo:enforcement": "bash scripts/demo-enforcement.sh",
+    "compare:branches": "bash scripts/compare-branches.sh"
   },
   "keywords": [
     "mongodb",
