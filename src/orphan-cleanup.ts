@@ -4,9 +4,9 @@
  */
 
 import { Db } from 'mongodb';
-import { RebuildConfig, OrphanedIndex } from './types';
-import { promptUser } from './prompts';
-import { getLogger } from './logger';
+import { RebuildConfig, OrphanedIndex } from './types.js';
+import { promptUser } from './prompts.js';
+import { getLogger } from './logger.js';
 
 /**
  * Phase 0: Cleanup orphaned temporary indexes

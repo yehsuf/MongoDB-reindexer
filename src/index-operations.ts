@@ -4,8 +4,8 @@
  */
 
 import { Collection } from 'mongodb';
-import { VALID_INDEX_OPTIONS } from './types';
-import { getLogger } from './logger';
+import { VALID_INDEX_OPTIONS } from './types.js';
+import { getLogger } from './logger.js';
 
 /**
  * Verify that an index exists and matches expected specification

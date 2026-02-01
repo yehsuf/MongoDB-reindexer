@@ -1,5 +1,5 @@
 import { MongoClient, Db } from 'mongodb';
-import { MONGO_CONSTANTS } from './constants';
+import { MONGO_CONSTANTS } from './constants.js';
 
 /**
  * Get cluster name from MongoDB connection

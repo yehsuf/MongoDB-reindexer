@@ -2,13 +2,13 @@
 
 import { Command } from 'commander';
 import { MongoClient } from 'mongodb';
-import { rebuildIndexes, cleanupOrphanedIndexes } from './index';
-import { RebuildConfig } from './types';
-import { DEFAULT_CONFIG } from './constants';
+import { rebuildIndexes, cleanupOrphanedIndexes } from './index.js';
+import { RebuildConfig } from './types.js';
+import { DEFAULT_CONFIG } from './constants.js';
 import * as dotenv from 'dotenv';
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { getLogger, setLogger, ConsoleLogger } from './logger';
+import { getLogger, setLogger, ConsoleLogger } from './logger.js';
 
 // Load environment variables
 dotenv.config();

@@ -13,17 +13,17 @@ import {
   IndexDocument,
   VALID_INDEX_OPTIONS,
   RebuildCoordinator
-} from './types';
-import { isIgnored } from './mongodb-utils';
-import { promptUser } from './prompts';
+} from './types.js';
+import { isIgnored } from './mongodb-utils.js';
+import { promptUser } from './prompts.js';
 import {
   bytesToMB,
   formatDuration,
   writeJsonFile
-} from './file-utils';
-import { RebuildPaths } from './types';
-import { getLogger } from './logger';
-import { verifyIndex } from './index-operations';
+} from './file-utils.js';
+import { RebuildPaths } from './types.js';
+import { getLogger } from './logger.js';
+import { verifyIndex } from './index-operations.js';
 
 /**
  * Helper to safely notify coordinator methods

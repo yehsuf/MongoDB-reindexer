@@ -1,9 +1,9 @@
 import * as readline from 'readline';
 import * as fs from 'fs';
 import * as path from 'path';
-import { t, getLocale } from './i18n';
-import { FILE_CONSTANTS } from './constants';
-import { getLogger } from './logger';
+import { t, getLocale } from './i18n.js';
+import { FILE_CONSTANTS } from './constants.js';
+import { getLogger } from './logger.js';
 
 /**
  * Help text for a prompt option

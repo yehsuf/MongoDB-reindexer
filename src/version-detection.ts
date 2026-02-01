@@ -4,7 +4,7 @@
  */
 
 import { Db } from 'mongodb';
-import { getLogger } from './logger';
+import { getLogger } from './logger.js';
 
 /**
  * MongoDB version-to-option mapping for dynamic option discovery
