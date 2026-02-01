@@ -1,0 +1,50 @@
+{
+  "name": "mongodb-reindexer",
+  "version": "1.0.0",
+  "description": "Zero-downtime MongoDB index rebuilding with Cover-Swap-Cleanup strategy",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "mongodb-reindex": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node src/cli.ts",
+    "start": "node dist/cli.js",
+    "prepare": "npm run build",
+    "lint": "eslint src --ext .ts",
+    "clean": "rm -rf dist",
+    "test": "node test/smoke-test.js",
+    "validate:structure": "node scripts/validate-structure.js",
+    "rebuild-npm": "rm -rf node_modules package-lock.json && npm install"
+  },
+  "keywords": [
+    "mongodb",
+    "index",
+    "reindex",
+    "zero-downtime",
+    "database"
+  ],
+  "author": "MongoDB Reindexer Contributors",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yehsuf/MongoDB-reindexer.git"
+  },
+  "dependencies": {
+    "commander": "^11.1.0",
+    "dotenv": "^16.3.1",
+    "mongodb": "^6.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^18.19.0",
+    "@typescript-eslint/eslint-plugin": "^8.54.0",
+    "@typescript-eslint/parser": "^8.54.0",
+    "eslint": "^9.39.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.0.4"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
