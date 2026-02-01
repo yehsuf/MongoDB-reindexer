@@ -144,3 +144,9 @@ vite.config.ts.timestamp-*
 # Internal documentation (not for public distribution)
 .github/
 .agent_memory/
+
+# macOS system files
+.DS_Store
+
+# Idea IDEs files
+.idea/

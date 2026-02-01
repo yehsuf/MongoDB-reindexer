@@ -3,29 +3,39 @@
  * Migrated from unit-tests.js (lines 85-210)
  */
 
-import { describe, it, beforeEach, afterEach } from 'node:test';
+import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 // Mock logger implementation for testing
+interface LogAccumulator {
+  info: string[];
+  warn: string[];
+  error: string[];
+  debug: string[];
+}
+
 class TestLogger {
+  verbose: boolean;
+  logs: LogAccumulator;
+
   constructor(verbose = false) {
     this.verbose = verbose;
     this.logs = { info: [], warn: [], error: [], debug: [] };
   }
 
-  info(message) {
+  info(message: string): void {
     this.logs.info.push(message);
   }
 
-  warn(message) {
+  warn(message: string): void {
     this.logs.warn.push(message);
   }
 
-  error(message) {
+  error(message: string): void {
     this.logs.error.push(message);
   }
 
-  debug(message) {
+  debug(message: string): void {
     if (this.verbose) {
       this.logs.debug.push(message);
     }
@@ -33,10 +43,10 @@ class TestLogger {
 }
 
 class SilentLogger {
-  info() {}
-  warn() {}
-  error() {}
-  debug() {}
+  info(): void {}
+  warn(): void {}
+  error(): void {}
+  debug(): void {}
 }
 
 describe('Logger Module', () => {
@@ -96,30 +106,40 @@ describe('Logger Module', () => {
 
       // Should not throw
       assert.doesNotThrow(() => {
-        logger.info('test');
-        logger.warn('test');
-        logger.error('test');
-        logger.debug('test');
+        logger.info();
+        logger.warn();
+        logger.error();
+        logger.debug();
       });
     });
   });
 
   describe('Global Logger Management', () => {
     it('should allow setting and getting global logger', () => {
-      class CustomLogger {
+      interface Logger {
+        name: string;
+        info(): void;
+        warn(): void;
+        error(): void;
+        debug(): void;
+      }
+
+      class CustomLogger implements Logger {
+        name: string;
+
         constructor() {
           this.name = 'custom';
         }
-        info() {}
-        warn() {}
-        error() {}
-        debug() {}
+        info(): void {}
+        warn(): void {}
+        error(): void {}
+        debug(): void {}
       }
 
       // Simple implementation
-      let globalLogger = { name: 'default' };
-      const setLogger = (logger) => { globalLogger = logger; };
-      const getLogger = () => globalLogger;
+      let globalLogger: Logger = { name: 'default', info: () => {}, warn: () => {}, error: () => {}, debug: () => {} };
+      const setLogger = (logger: Logger): void => { globalLogger = logger; };
+      const getLogger = (): Logger => globalLogger;
 
       const customLogger = new CustomLogger();
       setLogger(customLogger);

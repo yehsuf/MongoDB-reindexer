@@ -3,20 +3,17 @@
  * Migrated from unit-tests.js (lines 320-490)
  */
 
-import { describe, it, before, after } from 'node:test';
+import { describe, it, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Mock utility functions for testing
-function bytesToMB(bytes) {
+function bytesToMB(bytes: number): number {
   return bytes / (1024 * 1024);
 }
 
-function formatDuration(seconds) {
+function formatDuration(seconds: number): string {
   const SECONDS_IN_MINUTE = 60;
   if (seconds < SECONDS_IN_MINUTE) {
     return `${seconds.toFixed(2)}s`;
@@ -26,13 +23,13 @@ function formatDuration(seconds) {
   return `${minutes}m ${remainingSeconds.toFixed(0)}s`;
 }
 
-function ensureDir(dirPath) {
+function ensureDir(dirPath: string): void {
   if (!fs.existsSync(dirPath)) {
     fs.mkdirSync(dirPath, { recursive: true });
   }
 }
 
-function readJsonFile(filePath, defaultValue) {
+function readJsonFile<T>(filePath: string, defaultValue: T): T {
   try {
     if (fs.existsSync(filePath)) {
       const content = fs.readFileSync(filePath, 'utf8');
@@ -44,11 +41,11 @@ function readJsonFile(filePath, defaultValue) {
   return defaultValue;
 }
 
-function writeJsonFile(filePath, data) {
+function writeJsonFile(filePath: string, data: unknown): void {
   fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
 }
 
-function deleteFile(filePath) {
+function deleteFile(filePath: string): void {
   if (fs.existsSync(filePath)) {
     fs.unlinkSync(filePath);
   }

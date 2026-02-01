@@ -38,7 +38,7 @@ describe('Constants Module', () => {
 
       for (const exportName of requiredExports) {
         assert.ok(
-          constants[exportName],
+          (constants as any)[exportName],
           `Missing export: ${exportName}`
         );
       }

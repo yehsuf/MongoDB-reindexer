@@ -25,7 +25,7 @@ describe('Types Module', () => {
 
       for (const option of standardOptions) {
         assert.ok(
-          VALID_INDEX_OPTIONS.includes(option),
+          VALID_INDEX_OPTIONS.includes(option as any),
           `Missing standard option: ${option}`
         );
       }
@@ -37,7 +37,7 @@ describe('Types Module', () => {
 
       for (const option of modernOptions) {
         assert.ok(
-          VALID_INDEX_OPTIONS.includes(option),
+          VALID_INDEX_OPTIONS.includes(option as any),
           `Missing modern option: ${option}`
         );
       }
@@ -59,7 +59,7 @@ describe('Types Module', () => {
 
       for (const option of geoOptions) {
         assert.ok(
-          VALID_INDEX_OPTIONS.includes(option),
+          VALID_INDEX_OPTIONS.includes(option as any),
           `Missing geo option: ${option}`
         );
       }
@@ -76,7 +76,7 @@ describe('Types Module', () => {
 
       for (const option of textOptions) {
         assert.ok(
-          VALID_INDEX_OPTIONS.includes(option),
+          VALID_INDEX_OPTIONS.includes(option as any),
           `Missing text option: ${option}`
         );
       }

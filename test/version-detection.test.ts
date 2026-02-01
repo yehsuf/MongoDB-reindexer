@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Mock version comparison helper
-function isVersionGreaterOrEqual(versionStr, minMajor, minMinor) {
+function isVersionGreaterOrEqual(versionStr: string, minMajor: number, minMinor: number): boolean {
   const parts = versionStr.split('.');
   const major = parseInt(parts[0]);
   const minor = parseInt(parts[1]);

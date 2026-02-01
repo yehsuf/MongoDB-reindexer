@@ -6,7 +6,7 @@
  * - unit-tests.js (index operations)
  */
 
-import { describe, it, before } from 'node:test';
+import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -121,7 +121,7 @@ describe('MongoDB Reindexer API', () => {
       const { VALID_INDEX_OPTIONS } = await import('../dist/types.js');
       const required = ['unique', 'expireAfterSeconds', 'sparse', 'hidden', 'collation'];
       for (const opt of required) {
-        assert.ok(VALID_INDEX_OPTIONS.includes(opt), `Missing option: ${opt}`);
+        assert.ok(VALID_INDEX_OPTIONS.includes(opt as any), `Missing option: ${opt}`);
       }
     });
 

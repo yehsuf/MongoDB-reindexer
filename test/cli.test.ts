@@ -5,7 +5,7 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
+import { spawn, type ChildProcess } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -35,23 +35,23 @@ describe('CLI Module', () => {
         return;
       }
 
-      return new Promise((resolve, reject) => {
-        const proc = spawn('node', [cliPath, '--help'], {
+      return new Promise<void>((resolve, reject) => {
+        const proc: ChildProcess = spawn('node', [cliPath, '--help'], {
           timeout: 5000
         });
 
         let stdout = '';
         let stderr = '';
 
-        proc.stdout.on('data', (data) => {
+        proc.stdout?.on('data', (data: Buffer) => {
           stdout += data.toString();
         });
 
-        proc.stderr.on('data', (data) => {
+        proc.stderr?.on('data', (data: Buffer) => {
           stderr += data.toString();
         });
 
-        proc.on('close', (code) => {
+        proc.on('close', (code: number | null) => {
           try {
             // Help should exit with code 0
             assert.ok(code === 0 || stdout.length > 0, 'Help command should succeed');
@@ -61,7 +61,7 @@ describe('CLI Module', () => {
           }
         });
 
-        proc.on('error', (err) => {
+        proc.on('error', (err: Error) => {
           reject(err);
         });
       });
@@ -76,18 +76,18 @@ describe('CLI Module', () => {
         return;
       }
 
-      return new Promise((resolve, reject) => {
-        const proc = spawn('node', [cliPath, '--version'], {
+      return new Promise<void>((resolve, reject) => {
+        const proc: ChildProcess = spawn('node', [cliPath, '--version'], {
           timeout: 5000
         });
 
         let stdout = '';
 
-        proc.stdout.on('data', (data) => {
+        proc.stdout?.on('data', (data: Buffer) => {
           stdout += data.toString();
         });
 
-        proc.on('close', (code) => {
+        proc.on('close', (code: number | null) => {
           try {
             // Version command should succeed or output version info
             assert.ok(code === 0 || stdout.length > 0, 'Version command should succeed');
@@ -97,7 +97,7 @@ describe('CLI Module', () => {
           }
         });
 
-        proc.on('error', (err) => {
+        proc.on('error', (err: Error) => {
           reject(err);
         });
       });
@@ -107,12 +107,13 @@ describe('CLI Module', () => {
   describe('CLI Module Imports', () => {
     it('should import required dependencies', async () => {
       try {
-        const cli = await import('../dist/cli.js');
+        await import('../dist/cli.js');
         // If it imports without errors, the test passes
         assert.ok(true, 'CLI module imports successfully');
       } catch (err) {
         // May fail if not built yet or if there are import issues
-        assert.ok(err.message.includes('Cannot find') || err.message.includes('ERR_MODULE_NOT_FOUND'),
+        const error = err as Error;
+        assert.ok(error.message.includes('Cannot find') || error.message.includes('ERR_MODULE_NOT_FOUND'),
           'CLI should fail gracefully if not built');
       }
     });

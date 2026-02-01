@@ -6,8 +6,13 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
+// Mock MongoDB client structure
+interface MockMongoClient {
+  s?: { url?: string };
+}
+
 // Mock utility functions for testing
-function getClusterName(client) {
+function getClusterName(client: MockMongoClient | null): string {
   try {
     const uri = (client && client.s && client.s.url) || '';
     if (uri) {
@@ -22,7 +27,7 @@ function getClusterName(client) {
   }
 }
 
-async function getReplicaSetName(db) {
+async function getReplicaSetName(_db: unknown): Promise<string> {
   try {
     const hello = { setName: 'test-rs' }; // Mock
     if (hello.setName) {
@@ -34,7 +39,7 @@ async function getReplicaSetName(db) {
   }
 }
 
-function isIgnored(name, ignoreList) {
+function isIgnored(name: string, ignoreList: string[]): boolean {
   for (const pattern of ignoreList) {
     if (pattern.endsWith('*')) {
       if (name.startsWith(pattern.slice(0, -1))) {
@@ -50,7 +55,7 @@ function isIgnored(name, ignoreList) {
 describe('MongoDB Utils Module', () => {
   describe('getClusterName()', () => {
     it('should extract cluster name from connection string', () => {
-      const client = {
+      const client: MockMongoClient = {
         s: { url: 'mongodb+srv://cluster0.abc.mongodb.net' }
       };
       const result = getClusterName(client);
@@ -58,7 +63,7 @@ describe('MongoDB Utils Module', () => {
     });
 
     it('should handle auth in connection string', () => {
-      const client = {
+      const client: MockMongoClient = {
         s: { url: 'mongodb+srv://user:pass@cluster1.xyz.mongodb.net' }
       };
       const result = getClusterName(client);
@@ -66,7 +71,7 @@ describe('MongoDB Utils Module', () => {
     });
 
     it('should return unknown-cluster for invalid input', () => {
-      const client = {
+      const client: MockMongoClient = {
         s: { url: 'invalid-url' }
       };
       const result = getClusterName(client);
@@ -74,7 +79,7 @@ describe('MongoDB Utils Module', () => {
     });
 
     it('should return unknown-cluster when no URL', () => {
-      const client = { s: {} };
+      const client: MockMongoClient = { s: {} };
       const result = getClusterName(client);
       assert.strictEqual(result, 'unknown-cluster');
     });
