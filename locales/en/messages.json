@@ -1,0 +1,45 @@
+{
+  "common": {
+    "help_trigger": "Type 'help', 'h', or '?' for more information",
+    "invalid_input": "Invalid input. Please enter one of: {options}",
+    "user_chose": "User chose: [{choice}]",
+    "available_options": "📖 Available options:",
+    "help_command": "help/? - Show this help message"
+  },
+  "errors": {
+    "critical_error": "❌❌❌ A CRITICAL ERROR OCCURRED! SCRIPT ABORTED. ❌❌❌",
+    "safety_check_failed": "[SAFETY CHECK FAILED]",
+    "safety_check_passed": "[SAFETY CHECK PASSED]",
+    "could_not_read_file": "⚠️ Could not read file: {file}. Using default.",
+    "user_aborted": "User aborted the operation"
+  },
+  "phases": {
+    "phase_0": "Phase 0: Checking for orphaned temporary indexes",
+    "phase_2": "Phase 2: Discovering and backing up all collections",
+    "phase_3": "Phase 3: Filtering and sorting target collections",
+    "phase_4": "Phase 4: Beginning rebuild process"
+  },
+  "messages": {
+    "starting_rebuild": "### Starting UNIVERSAL index rebuild for database: \"{database}\" ###",
+    "no_orphans": "✅ No orphaned indexes found.",
+    "orphans_found": "⚠️ Found {count} orphaned temporary index(es):",
+    "cleanup_starting": "-> Starting cleanup...",
+    "cleanup_complete": "✅ Cleanup complete.",
+    "backup_created": "✅ Index backup created at: \"{file}\"",
+    "loading_state": "-> Loading state from previous run...",
+    "no_indexes_to_rebuild": "No indexes in this collection require rebuild.",
+    "skipping_index": "ℹ️ Skipping index: \"{index}\" (already marked as completed in state file).",
+    "rebuild_complete": "✅✅✅ ALL-CLEAR: DATABASE REBUILD IS FULLY COMPLETE! ✅✅✅",
+    "performance_summary": "--- PERFORMANCE SUMMARY ---",
+    "log_saved": "✅ Performance log saved to: \"{file}\"",
+    "state_removed": "✅ Run completed successfully. Removed state file: \"{file}\"",
+    "partial_log": "⚠️ Partial performance log with error saved to: \"{file}\""
+  },
+  "prompts": {
+    "proceed_cleanup": "Proceed with cleanup?",
+    "proceed_collections": "Proceed with these collections?",
+    "proceed_indexes": "Proceed with these indexes?",
+    "process_collection": "Process collection \"{name}\"?",
+    "process_index": "Process index \"{name}\"?"
+  }
+}
