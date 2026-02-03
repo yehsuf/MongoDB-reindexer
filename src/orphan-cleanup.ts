@@ -4,14 +4,14 @@
  */
 
 import { Db } from 'mongodb';
-import { RebuildConfig, OrphanedIndex } from './types.js';
+import { RebuildConfig, RebuildState, OrphanedIndex } from './types.js';
 import { promptUser } from './prompts.js';
 import { getLogger } from './logger.js';
 
 /**
  * Phase 0: Cleanup orphaned temporary indexes
  */
-export async function cleanupOrphanedIndexes(db: Db, config: RebuildConfig): Promise<void> {
+export async function cleanupOrphanedIndexes(db: Db, config: RebuildConfig, state?: RebuildState): Promise<void> {
   getLogger().info("--- Phase 0: Checking for orphaned temporary indexes ---");
 
   const orphanedIndexes: OrphanedIndex[] = [];
@@ -20,7 +20,28 @@ export async function cleanupOrphanedIndexes(db: Db, config: RebuildConfig): Pro
   for (const collName of collectionNames) {
     const collection = db.collection(collName);
     const indexes = await collection.indexes();
-    const orphansInColl = indexes.filter(idx => idx.name && idx.name.endsWith(config.coverSuffix!));
+
+    // Filter for indexes with the cover suffix
+    const orphansInColl = indexes.filter(idx => {
+      // Must have name and end with suffix
+      if (!idx.name || !idx.name.endsWith(config.coverSuffix!)) {
+        return false;
+      }
+
+      // If state is provided (Automatic Mode), use STRICT cleanup
+      // Only delete if the original index was marked as completed
+      if (state) {
+        const originalName = idx.name.slice(0, -config.coverSuffix!.length);
+        const completedForColl = state.completed[collName] || [];
+        // If not in completed list, it might be a temp index from a run that crashed
+        // BEFORE completion, so strictly speaking we shouldn't touch it automatically?
+        // Plan says: "check if the original index name exists in state.completed[collName]. STRICT."
+        return completedForColl.includes(originalName);
+      }
+
+      // If no state (CLI Mode), use AGGRESSIVE cleanup (include all matchers)
+      return true;
+    });
 
     if (orphansInColl.length > 0) {
       orphansInColl.forEach(o => {

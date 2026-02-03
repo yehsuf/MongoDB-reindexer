@@ -641,12 +641,63 @@ Modern MongoDB query optimizers are highly effective and often select better ind
 
 ### Testing Resources
 
-- **[Live Testing Guide](docs/LIVE_TESTING_GUIDE.md)** - Practical guide for testing with live MongoDB instances
+- **[Live Testing Guide](docs/cluster-testing/LIVE_TESTING_GUIDE.md)** - Practical guide for testing with live MongoDB instances
   - Quick start guide
   - Test scenarios (basic rebuild, filtering, wildcards, TTL, performance testing)
   - Validation procedures
   - Troubleshooting common issues
   - Cleanup procedures
+
+- **[Cluster Testing Guide](docs/cluster-testing/CLUSTER_TESTING_GUIDE.md)** - Test both CLI and NPM modes against MongoDB test cluster
+  - Test cluster setup with sample data
+  - CLI mode direct execution
+  - NPM mode integration tests
+  - Automated test execution for CI/CD
+  - Result logging and verification
+
+- **[Cluster Testing Quick Start](docs/cluster-testing/CLUSTER_TESTING_QUICKSTART.md)** - Get started in 5 minutes
+  - Docker setup (recommended)
+  - Local MongoDB setup
+  - Environment configuration
+  - Quick verification
+
+### Running Tests
+
+#### Unit and Integration Tests
+
+```bash
+npm test
+```
+
+Run all unit and integration tests using Node.js built-in test runner.
+
+#### Cluster Tests (Both CLI and NPM Modes)
+
+```bash
+export MONGODB_TEST_URI="mongodb://testuser:testpass@localhost:27017"
+./scripts/run-cluster-tests.sh "$MONGODB_TEST_URI" "reindex_test"
+```
+
+This runs:
+1. **CLI Mode Tests** - Direct command-line execution against test cluster
+2. **NPM Mode Tests** - Unit/integration tests with cluster URI
+3. **Results File** - Timestamped results saved to `.agent_memory/test_results_{timestamp}.md`
+
+#### CLI Mode Only
+
+```bash
+./scripts/test-cli-mode.sh "mongodb://testuser:testpass@localhost:27017" "reindex_test"
+```
+
+Tests the CLI directly: list, rebuild, verify operations.
+
+#### NPM Mode Only
+
+```bash
+MONGODB_TEST_URI="mongodb://testuser:testpass@localhost:27017" npm test
+```
+
+Runs all unit and integration tests with cluster connection.
 
 ---
 

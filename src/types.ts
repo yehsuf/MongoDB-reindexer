@@ -124,6 +124,8 @@ export interface DatabaseLog {
   collections: Record<string, CollectionLog>;
   /** Error message if any */
   error: string | null;
+  /** Error stack trace if any */
+  errorStack?: string;
 }
 
 /**

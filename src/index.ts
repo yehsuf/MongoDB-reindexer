@@ -123,7 +123,7 @@ export async function rebuildIndexes(db: Db, config: RebuildConfig): Promise<Dat
     }
 
     // Phase 0: Cleanup orphans
-    await cleanupOrphanedIndexes(db, fullConfig);
+    await cleanupOrphanedIndexes(db, fullConfig, state);
 
     // Detect MongoDB server version
     const serverVersion = await detectServerVersion(db);
@@ -289,9 +289,16 @@ export async function rebuildIndexes(db: Db, config: RebuildConfig): Promise<Dat
     deleteFile(paths.stateFile);
     getLogger().info(`\n✅ Run completed successfully. Removed state file: "${paths.stateFile}"`);
 
+    // Clean up backup file on success
+    deleteFile(paths.backupFile);
+    getLogger().info(`\n✅ Removed schema backup file (unused in this mode): "${paths.backupFile}"`);
+
   } catch (e) {
     getLogger().error(`\n\n❌❌❌ A CRITICAL ERROR OCCURRED! SCRIPT ABORTED. ❌❌❌`);
     dbLog.error = e instanceof Error ? e.message : String(e);
+    if (e instanceof Error && e.stack) {
+      dbLog.errorStack = e.stack;
+    }
 
     if (fullConfig.performanceLogging.enabled && paths.logFile) {
       try {

@@ -67,6 +67,11 @@ export async function rebuildCollectionIndexes(
 
   // Filter processable indexes
   const processableIndexes = indexStats.filter(indexStat => {
+    // Exclude temp indexes
+    if (indexStat.name.endsWith(config.coverSuffix!)) {
+      return false;
+    }
+
     const idx = backedUpIndexes.find(i => i.name === indexStat.name);
     const isAlreadyCompleted = state.completed[collectionName]?.includes(idx?.name || '');
 
@@ -195,13 +200,7 @@ export async function rebuildCollectionIndexes(
     await collection.dropIndex(coveringName);
     getLogger().info(`  -> Command completed.`);
 
-    // Get final index size using indexStats from db.collection.stats()
-    const finalStats = await db.command({
-      collStats: collection.collectionName,
-      indexDetails: false
-    });
-    const finalIndexSize = finalStats.indexSizes?.[originalName] || 0;
-    indexLog.finalSizeMb = bytesToMB(finalIndexSize);
+    // Record time, but defer size measurement to the end (Rebuild-Then-Measure strategy)
     indexLog.timeSeconds = (new Date().getTime() - indexLog.startTime.getTime()) / 1000;
     collectionLog.indexes[originalName] = indexLog;
 
@@ -213,16 +212,34 @@ export async function rebuildCollectionIndexes(
     getLogger().info(`  💾 State file updated.`);
 
     // Notify coordinator that index rebuild is complete
-    await notifyCoordinator(config.coordinator, 'onIndexComplete', collectionName, originalName, indexLog.timeSeconds, true);
+    await notifyCoordinator(
+      config.coordinator,
+      'onIndexComplete',
+      collectionName,
+      originalName,
+      indexLog.timeSeconds,
+      true
+    );
 
-    getLogger().info(`--- Rebuild for '${originalName}' complete in ${formatDuration(indexLog.timeSeconds)}. ---`);
+    getLogger().info(`\n--- Rebuild for '${originalName}' complete in ${formatDuration(indexLog.timeSeconds)}. ---`);
   }
 
-  // Calculate collection summary
+  // PASS 2: Measurement (Rebuild-Then-Measure)
+  // Fetch stats once at the end to ensure accuracy and avoid "null" stats issues
+  getLogger().info(`\n--- Finalizing statistics for collection "${collectionName}"... ---`);
+
   const finalCollectionStats = await db.command({
     collStats: collection.collectionName,
     indexDetails: false
   });
+
+  // Backfill final sizes for all processed indexes
+  for (const indexName in collectionLog.indexes) {
+    const finalIndexSize = finalCollectionStats.indexSizes?.[indexName] || 0;
+    collectionLog.indexes[indexName].finalSizeMb = bytesToMB(finalIndexSize);
+    getLogger().info(`  - Measured final size for '${indexName}': ${collectionLog.indexes[indexName].finalSizeMb.toFixed(3)} MB`);
+  }
+
   let initialTotalSize = 0;
   for (const stat of indexStats) {
     initialTotalSize += (stat.size || 0);

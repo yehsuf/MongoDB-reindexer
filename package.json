@@ -50,10 +50,11 @@
     "test": "tsx --test test/*.test.ts",
     "test:watch": "tsx --test --watch test/*.test.ts",
     "test:coverage": "tsx --test --experimental-test-coverage test/*.test.ts",
+    "test:cluster": "./scripts/run-qa-unified.sh",
     "test:typecheck": "tsc -p tsconfig.test.json",
     "pretest": "npm run build",
     "prepublishOnly": "npm run clean && npm run build && npm test",
-    "validate:structure": "node scripts/validate-structure.js",
+    "validate:structure": "node .github/scripts/validate-structure.js",
     "rebuild-npm": "rm -rf node_modules package-lock.json && npm install"
   },
   "keywords": [
