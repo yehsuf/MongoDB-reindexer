@@ -1,0 +1,19 @@
+{
+  "id": "cleanup-confirm",
+  "question": "Proceed with cleanup?",
+  "options": [
+    {
+      "value": "yes",
+      "shortcut": "y",
+      "description": "Drop all orphaned temporary indexes",
+      "details": "Removes all indexes ending with '_cover_temp' suffix that were left behind from previous failed operations"
+    },
+    {
+      "value": "no",
+      "shortcut": "n",
+      "description": "Abort cleanup operation and exit",
+      "details": "Stops the cleanup process without removing any indexes"
+    }
+  ],
+  "context": "Orphaned indexes are temporary indexes that remain after failed rebuild operations. They are safe to remove."
+}

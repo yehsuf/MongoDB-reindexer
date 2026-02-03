@@ -16,25 +16,25 @@ import {
   DatabaseLog,
   RebuildPaths,
   RebuildCoordinator
-} from './types';
+} from './types.js';
 import {
   getClusterName,
   getReplicaSetName,
   isIgnored
-} from './mongodb-utils';
-import { promptUser } from './prompts';
+} from './mongodb-utils.js';
+import { promptUser } from './prompts.js';
 import {
   ensureDir,
   readJsonFile,
   writeJsonFile,
   deleteFile,
   bytesToMB
-} from './file-utils';
-import { DEFAULT_CONFIG } from './constants';
-import { getLogger } from './logger';
-import { cleanupOrphanedIndexes } from './orphan-cleanup';
-import { rebuildCollectionIndexes } from './collection-processor';
-import { detectServerVersion, getValidOptionsForVersion } from './version-detection';
+} from './file-utils.js';
+import { DEFAULT_CONFIG } from './constants.js';
+import { getLogger } from './logger.js';
+import { cleanupOrphanedIndexes } from './orphan-cleanup.js';
+import { rebuildCollectionIndexes } from './collection-processor.js';
+import { detectServerVersion, getValidOptionsForVersion } from './version-detection.js';
 
 /**
  * Helper to safely notify coordinator methods
@@ -309,6 +309,8 @@ export async function rebuildIndexes(db: Db, config: RebuildConfig): Promise<Dat
 }
 
 export { cleanupOrphanedIndexes };
-export { ILogger, ConsoleLogger, SilentLogger, getLogger, setLogger } from './logger';
-export { RebuildCoordinator } from './types';
-export { ServerVersionInfo, detectServerVersion, getValidOptionsForVersion, filterIndexOptions } from './version-detection';
+export { ConsoleLogger, SilentLogger, getLogger, setLogger } from './logger.js';
+export type { ILogger } from './logger.js';
+export type { RebuildCoordinator } from './types.js';
+export { detectServerVersion, getValidOptionsForVersion, filterIndexOptions } from './version-detection.js';
+export type { ServerVersionInfo } from './version-detection.js';

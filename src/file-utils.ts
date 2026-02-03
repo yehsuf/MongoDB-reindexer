@@ -1,5 +1,5 @@
 import * as fs from 'fs';
-import { FORMAT_CONSTANTS } from './constants';
+import { FORMAT_CONSTANTS } from './constants.js';
 
 /**
  * Ensure directory exists

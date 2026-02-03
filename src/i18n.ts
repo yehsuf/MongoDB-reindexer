@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { FILE_CONSTANTS } from './constants';
+import { FILE_CONSTANTS } from './constants.js';
 
 /**
  * Locale configuration interface

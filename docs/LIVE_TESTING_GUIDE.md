@@ -718,9 +718,6 @@ rm -rf .rebuild_runtime/
 ## Additional Resources
 
 - **Main Documentation:** [README.md](../README.md)
-- **Testing Scenarios:** [TESTING.md](../TESTING.md)
-- **Contributing Guidelines:** [CONTRIBUTING.md](../CONTRIBUTING.md)
-- **Project Conventions:** [CONVENTIONS.md](../CONVENTIONS.md)
 
 ---
 
@@ -734,4 +731,4 @@ For issues and questions:
 ---
 
 **Last Updated:** February 1, 2026  
-**Version:** 1.0.0
+**Version:** 1.0.0-rc

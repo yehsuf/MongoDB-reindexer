@@ -219,7 +219,7 @@ Proceed with these collections? (yes/no/specify) [y/n/s]: ?
 Proceed with these collections? (yes/no/specify) [y/n/s]: 
 ```
 
-Help text is loaded from JSON configuration files in `locales/{locale}/prompts/`. See [locales/README.md](locales/README.md) for details on the help file format.
+Help text is loaded from JSON configuration files in `locales/{locale}/prompts/` for easy customization.
 
 ### Performance Logging
 
@@ -306,7 +306,6 @@ locales/
 │       ├── collection-specify.json
 │       ├── indexes.json
 │       └── index-specify.json
-└── README.md              # Localization system documentation
 ```
 
 **Using Help:**
@@ -335,7 +334,6 @@ Edit the JSON files in `locales/{locale}/prompts/` to customize help text. Each 
 }
 ```
 
-See [locales/README.md](locales/README.md) for complete documentation on the help file format.
 
 ## Requirements
 
@@ -380,7 +378,6 @@ LOCALE=en mongodb-reindex rebuild --database mydb
    LOCALE=es npm start rebuild --database mydb
    ```
 
-See [locales/README.md](locales/README.md) for complete documentation on the localization system, translation guidelines, and file formats.
 
 ## Development
 
@@ -394,7 +391,7 @@ npm run build
 ### Development Mode
 
 ```bash
-npm run dev rebuild --database mydb  # Uses ts-node
+npm run dev rebuild --database mydb  # Uses tsx
 ```
 
 ### Linting
@@ -651,18 +648,6 @@ Modern MongoDB query optimizers are highly effective and often select better ind
   - Troubleshooting common issues
   - Cleanup procedures
 
-- **[Testing Guide (TESTING.md)](TESTING.md)** - Comprehensive testing documentation
-  - Live database testing procedures
-  - Hinted query scenario testing
-  - Step-by-step test scripts
-  - Expected behaviors and verification
-
-### Additional Documentation
-
-- **[Contributing Guidelines](CONTRIBUTING.md)** - How to contribute to the project
-- **[Project Conventions](CONVENTIONS.md)** - File organization and development standards
-- **[Localization System](locales/README.md)** - Internationalization documentation
-
 ---
 
 ## License
@@ -671,8 +656,7 @@ MIT
 
 ## Contributing
 
-Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
+Contributions are welcome! For bugs and feature requests, please open an issue on GitHub.
 
 ## Support
 

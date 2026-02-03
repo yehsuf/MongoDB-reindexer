@@ -2,16 +2,21 @@
 
 import { Command } from 'commander';
 import { MongoClient } from 'mongodb';
-import { rebuildIndexes, cleanupOrphanedIndexes } from './index';
-import { RebuildConfig } from './types';
-import { DEFAULT_CONFIG } from './constants';
+import { rebuildIndexes, cleanupOrphanedIndexes } from './index.js';
+import { RebuildConfig } from './types.js';
+import { DEFAULT_CONFIG } from './constants.js';
 import * as dotenv from 'dotenv';
 import { readFileSync } from 'fs';
-import { join } from 'path';
-import { getLogger, setLogger, ConsoleLogger } from './logger';
+import { dirname, join } from 'path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { getLogger, setLogger, ConsoleLogger } from './logger.js';
 
 // Load environment variables
 dotenv.config();
+
+// ES module compatible __dirname equivalent
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 // Import package.json to get version
 const pkg = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf8'));
@@ -161,7 +166,21 @@ program
     }
   });
 
-program.parse(process.argv);
+/**
+ * Detect if this module is being run directly (not imported)
+ */
+function isMainModule(): boolean {
+  try {
+    const mainModule = pathToFileURL(process.argv[1]).href;
+    return mainModule === import.meta.url;
+  } catch {
+    return false;
+  }
+}
+
+if (isMainModule()) {
+  program.parse(process.argv);
+}
 
 // Show help if no command provided
 if (!process.argv.slice(2).length) {

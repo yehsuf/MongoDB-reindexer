@@ -1,0 +1,25 @@
+{
+  "id": "collections-proceed",
+  "question": "Proceed with these collections?",
+  "options": [
+    {
+      "value": "yes",
+      "shortcut": "y",
+      "description": "Process all listed collections",
+      "details": "Automatically processes all non-unique indexes in each collection shown above"
+    },
+    {
+      "value": "no",
+      "shortcut": "n",
+      "description": "Abort the entire operation",
+      "details": "Exits the rebuild process completely. Progress up to this point is saved in state file."
+    },
+    {
+      "value": "specify",
+      "shortcut": "s",
+      "description": "Interactively choose which collections to process",
+      "details": "Shows a prompt for each collection, allowing you to select which ones to rebuild"
+    }
+  ],
+  "context": "Collections are sorted by total index size (largest first) to provide the most benefit early in the process."
+}
