@@ -4,6 +4,10 @@ import * as path from 'path';
 import { t, getLocale } from './i18n.js';
 import { FILE_CONSTANTS } from './constants.js';
 import { getLogger } from './logger.js';
+import {fileURLToPath} from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /**
  * Help text for a prompt option
@@ -61,8 +65,8 @@ function loadHelpFile(helpFileId: string): PromptOption[] | null {
         details: opt.details
       }));
     }
-  } catch {
-    getLogger().warn(t('errors.could_not_read_file', { file: helpFileId }));
+  } catch (e) {
+    getLogger().warn('errors.could_not_read_file', { file: helpFileId } ,e as Error);
   }
   return null;
 }

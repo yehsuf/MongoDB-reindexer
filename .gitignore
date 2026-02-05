@@ -69,6 +69,8 @@ web_modules/
 .env
 .env.*
 !.env.example
+.env*
+.envrc
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache
@@ -153,3 +155,11 @@ vite.config.ts.timestamp-*
 
 # Idea IDEs files
 .idea/
+.internal_docs/
+rebuild_logs/
+/scripts/qa-cluster-test.sh
+/scripts/qa-cluster-validation.sh
+/scripts/test-with-env.sh
+/scripts/load-env.sh
+/.rebuild_runtime/
+/docs/ENV_SETUP_GUIDE.md

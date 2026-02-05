@@ -5,6 +5,60 @@
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/cli.ts",
+    "start": "node dist/cli.js",
+    "prepare": "npm run build",
+    "lint": "eslint src --ext .ts",
+    "lint:fix": "eslint src --ext .ts --fix",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test test/*.test.ts",
+    "test:watch": "tsx --test --watch test/*.test.ts",
+    "test:coverage": "tsx --test --experimental-test-coverage test/*.test.ts",
+    "test:cluster": "./scripts/run-qa-unified.sh",
+    "test:typecheck": "tsc -p tsconfig.test.json",
+    "pretest": "npm run build",
+    "prepublishOnly": "npm run clean && npm run build && npm test",
+    "rebuild-npm": "rm -rf node_modules package-lock.json && npm install"
+  },
+  "keywords": [
+    "mongodb",
+    "index",
+    "reindex",
+    "zero-downtime",
+    "database",
+    "maintenance",
+    "cover-swap-cleanup"
+  ],
+  "author": "MongoDB Reindexer Contributors",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yehsuf/MongoDB-reindexer.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yehsuf/MongoDB-reindexer/issues"
+  },
+  "homepage": "https://github.com/yehsuf/MongoDB-reindexer#readme",
+
+  "dependencies": {
+    "commander": "^11.1.0",
+    "dotenv": "^16.3.1",
+    "mongodb": "^6.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.0",
+    "tsx": "^4.7.0",
+    "@typescript-eslint/eslint-plugin": "^8.54.0",
+    "@typescript-eslint/parser": "^8.54.0",
+    "eslint": "^9.39.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -38,59 +92,5 @@
     "README.md",
     "LICENSE"
   ],
-  "scripts": {
-    "build": "tsc",
-    "dev": "tsx src/cli.ts",
-    "start": "node dist/cli.js",
-    "prepare": "npm run build",
-    "lint": "eslint src --ext .ts",
-    "lint:fix": "eslint src --ext .ts --fix",
-    "clean": "rm -rf dist",
-    "typecheck": "tsc --noEmit",
-    "test": "tsx --test test/*.test.ts",
-    "test:watch": "tsx --test --watch test/*.test.ts",
-    "test:coverage": "tsx --test --experimental-test-coverage test/*.test.ts",
-    "test:cluster": "./scripts/run-qa-unified.sh",
-    "test:typecheck": "tsc -p tsconfig.test.json",
-    "pretest": "npm run build",
-    "prepublishOnly": "npm run clean && npm run build && npm test",
-    "validate:structure": "node .github/scripts/validate-structure.js",
-    "rebuild-npm": "rm -rf node_modules package-lock.json && npm install"
-  },
-  "keywords": [
-    "mongodb",
-    "index",
-    "reindex",
-    "zero-downtime",
-    "database",
-    "maintenance",
-    "cover-swap-cleanup"
-  ],
-  "author": "MongoDB Reindexer Contributors",
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/yehsuf/MongoDB-reindexer.git"
-  },
-  "bugs": {
-    "url": "https://github.com/yehsuf/MongoDB-reindexer/issues"
-  },
-  "homepage": "https://github.com/yehsuf/MongoDB-reindexer#readme",
-  "dependencies": {
-    "commander": "^11.1.0",
-    "dotenv": "^16.3.1",
-    "mongodb": "^6.3.0"
-  },
-  "devDependencies": {
-    "@types/node": "^20.10.0",
-    "typescript": "^5.3.0",
-    "tsx": "^4.7.0",
-    "@typescript-eslint/eslint-plugin": "^8.54.0",
-    "@typescript-eslint/parser": "^8.54.0",
-    "eslint": "^9.39.2"
-  },
-  "engines": {
-    "node": ">=18.0.0"
-  },
   "packageManager": "npm@10.2.0"
 }

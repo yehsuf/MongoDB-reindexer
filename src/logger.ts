@@ -12,7 +12,7 @@ export interface ILogger {
   /**
    * Log warning message
    */
-  warn(message: string): void;
+  warn(message?: string, ...optionalParams: any[]): void;
 
   /**
    * Log error message
@@ -29,7 +29,7 @@ export interface ILogger {
  * Console-based logger implementation
  */
 export class ConsoleLogger implements ILogger {
-  private verbose: boolean;
+  private readonly verbose: boolean;
 
   constructor(verbose: boolean = false) {
     this.verbose = verbose;
@@ -39,8 +39,8 @@ export class ConsoleLogger implements ILogger {
     console.log(message);
   }
 
-  warn(message: string): void {
-    console.warn(message);
+  warn(message?: string, ...optionalParams: any[]): void {
+    console.warn(message, ...optionalParams);
   }
 
   error(message: string): void {

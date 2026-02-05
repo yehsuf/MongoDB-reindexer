@@ -77,9 +77,9 @@ export async function detectServerVersion(db: Db): Promise<ServerVersionInfo> {
       minor,
       normalized: `${major}.${minor}`
     };
-  } catch (error) {
+  } catch (e) {
     // Fallback to conservative version (MongoDB 3.0)
-    getLogger().warn('Could not detect MongoDB version, assuming 3.0 compatibility');
+    getLogger().warn('Could not detect MongoDB version, assuming 3.0 compatibility', (e as Error).message || e);
     return {
       fullVersion: '3.0.0',
       major: 3,

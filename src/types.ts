@@ -5,6 +5,9 @@ export interface RebuildConfig {
   /** Database name to process */
   dbName: string;
 
+  /** Cluster name for logging purposes (optional) */
+  clusterName?: string;
+
   /** Directory for performance logs */
   logDir?: string;
 
@@ -33,6 +36,9 @@ export interface RebuildConfig {
   performanceLogging?: {
     enabled: boolean;
   };
+
+  /** Save individual collection logs to files */
+  saveCollectionLog?: boolean;
 
   /** Optional coordinator for rebuild lifecycle hooks */
   coordinator?: RebuildCoordinator;
@@ -122,8 +128,10 @@ export interface DatabaseLog {
   totalReclaimedMb: number;
   /** Logs for individual collections */
   collections: Record<string, CollectionLog>;
+  /** Warnings encountered */
+  warnings: string[];
   /** Error message if any */
-  error: string | null;
+  error?: string;
   /** Error stack trace if any */
   errorStack?: string;
 }
@@ -148,6 +156,8 @@ export interface RebuildPaths {
   backupFile: string;
   /** Log file path */
   logFile: string;
+  /** Directory for collection-level logs */
+  collectionLogDir?: string;
 }
 
 /**
@@ -245,12 +255,14 @@ export interface RebuildCoordinator {
    * @param totalReclaimedMb - Total space reclaimed
    * @param totalSeconds - Total duration
    * @param success - Whether entire rebuild succeeded
+   * @param warning - Any warning encountered
    */
   onRebuildComplete?(
     dbName: string,
     totalReclaimedMb: number,
     totalSeconds: number,
-    success: boolean
+    success: boolean,
+    warning?: string
   ): Promise<void> | void;
 
   /**

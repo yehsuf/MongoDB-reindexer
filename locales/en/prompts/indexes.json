@@ -21,7 +21,7 @@
       "details": "Shows a prompt for each index, allowing selective rebuilding"
     },
     {
-      "value": "skip",
+      "value": "back",
       "shortcut": "b",
       "description": "Skip this collection and move to the next one",
       "details": "Skips all indexes in this collection and continues to the next collection"

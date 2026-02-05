@@ -35,6 +35,8 @@ import { getLogger } from './logger.js';
 import { cleanupOrphanedIndexes } from './orphan-cleanup.js';
 import { rebuildCollectionIndexes } from './collection-processor.js';
 import { detectServerVersion, getValidOptionsForVersion } from './version-detection.js';
+import {runtimeDeprecatedCleanup} from "./runtime-dep-cleanup.js";
+import {__pathToRuntimeDir} from "./cli.js";
 
 /**
  * Helper to safely notify coordinator methods
@@ -61,6 +63,7 @@ export async function rebuildIndexes(db: Db, config: RebuildConfig): Promise<Dat
   // Set defaults
   const fullConfig = {
     dbName: config.dbName,
+    clusterName: config.clusterName || 'unknown-cluster',
     logDir: config.logDir || DEFAULT_CONFIG.LOG_DIR,
     runtimeDir: config.runtimeDir || DEFAULT_CONFIG.RUNTIME_DIR,
     coverSuffix: config.coverSuffix || DEFAULT_CONFIG.COVER_SUFFIX,
@@ -70,12 +73,13 @@ export async function rebuildIndexes(db: Db, config: RebuildConfig): Promise<Dat
     ignoredCollections: config.ignoredCollections || [],
     ignoredIndexes: config.ignoredIndexes || [],
     performanceLogging: config.performanceLogging || DEFAULT_CONFIG.PERFORMANCE_LOGGING,
+    saveCollectionLog: config.saveCollectionLog !== undefined ? config.saveCollectionLog : false,
     coordinator: config.coordinator
   };
 
   let state: RebuildState = { completed: {} };
   const dbLog: DatabaseLog = {
-    clusterName: 'unknown',
+    clusterName: fullConfig.clusterName,
     dbName: fullConfig.dbName,
     startTime: new Date().toISOString(),
     totalTimeSeconds: 0,
@@ -83,7 +87,7 @@ export async function rebuildIndexes(db: Db, config: RebuildConfig): Promise<Dat
     totalFinalSizeMb: 0,
     totalReclaimedMb: 0,
     collections: {},
-    error: null
+    warnings: []
   };
 
   let paths: RebuildPaths = {
@@ -108,12 +112,16 @@ export async function rebuildIndexes(db: Db, config: RebuildConfig): Promise<Dat
     paths = {
       stateFile: `${fullConfig.runtimeDir}/${clusterName}_state.json`,
       backupFile: `${fullConfig.runtimeDir}/${clusterName}_backup_${timestamp}.json`,
-      logFile: `${fullConfig.logDir}/${clusterName}_rebuild_log_${timestamp}.json`
+      logFile: `${fullConfig.logDir}/${clusterName}_rebuild_log_${timestamp}.json`,
+      collectionLogDir: fullConfig.saveCollectionLog ? `${fullConfig.logDir}/${clusterName}_collections_${timestamp}` : undefined
     };
 
     ensureDir(fullConfig.runtimeDir);
     if (fullConfig.performanceLogging.enabled) {
       ensureDir(fullConfig.logDir);
+    }
+    if (fullConfig.saveCollectionLog && paths.collectionLogDir) {
+      ensureDir(paths.collectionLogDir);
     }
 
     // Load state if exists
@@ -124,6 +132,7 @@ export async function rebuildIndexes(db: Db, config: RebuildConfig): Promise<Dat
 
     // Phase 0: Cleanup orphans
     await cleanupOrphanedIndexes(db, fullConfig, state);
+    await runtimeDeprecatedCleanup(__pathToRuntimeDir, clusterName);
 
     // Detect MongoDB server version
     const serverVersion = await detectServerVersion(db);
@@ -143,8 +152,7 @@ export async function rebuildIndexes(db: Db, config: RebuildConfig): Promise<Dat
       allIndexesBackup[name] = await collection.indexes() as IndexDocument[];
 
       const stats = await db.command({
-        collStats: name,
-        indexDetails: false
+        collStats: name
       });
       const indexSizes = stats.indexSizes || {};
       const indexStatsArray: IndexStat[] = Object.entries(indexSizes).map(([indexName, indexSize]) => ({
@@ -180,7 +188,9 @@ export async function rebuildIndexes(db: Db, config: RebuildConfig): Promise<Dat
     }
 
     if (collectionsToProcess.length === 0) {
-      throw new Error("No collections match the specified criteria.");
+      getLogger().error("No collections match the specified criteria.");
+      dbLog.error = "No collections match the specified criteria.";
+      return dbLog;
     }
 
     for (const coll of collectionsToProcess) {
@@ -204,7 +214,9 @@ export async function rebuildIndexes(db: Db, config: RebuildConfig): Promise<Dat
       getLogger().info(`User chose: [${responseWord}].`);
 
       if (responseChar === 'n') {
-        throw new Error("User aborted.");
+        getLogger().info("User chose not to proceed. Operation aborted.");
+        dbLog.warnings.push("User aborted.");
+        return dbLog;
       }
       if (responseChar === 's') {
         specifyCollectionMode = true;
@@ -231,7 +243,8 @@ export async function rebuildIndexes(db: Db, config: RebuildConfig): Promise<Dat
           continue;
         }
         if (continueWithColl === 'e') {
-          throw new Error("User chose to end operation.");
+          getLogger().info(`User chose to end operation. Finishing rebuild...`);
+          break;
         }
       }
 
@@ -249,6 +262,13 @@ export async function rebuildIndexes(db: Db, config: RebuildConfig): Promise<Dat
 
       if (result.status !== 'skipped') {
         dbLog.collections[collectionInfo.name] = result.log;
+
+        // Save individual collection log if enabled
+        if (fullConfig.saveCollectionLog && paths.collectionLogDir) {
+          const collectionLogPath = `${paths.collectionLogDir}/${collectionInfo.name}_log.json`;
+          writeJsonFile(collectionLogPath, result.log);
+          getLogger().info(`✅ Collection log saved to: "${collectionLogPath}"`);
+        }
       }
     }
 
