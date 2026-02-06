@@ -3,7 +3,8 @@
 import { Command } from 'commander';
 import { MongoClient } from 'mongodb';
 import { rebuildIndexes, cleanupOrphanedIndexes,  } from './index.js';
-import { RebuildConfig } from './types.js';
+import { compactCollections } from './compact-operations.js';
+import { RebuildConfig, CompactConfig } from './types.js';
 import { DEFAULT_CONFIG } from './constants.js';
 import * as dotenv from 'dotenv';
 import { readFileSync } from 'fs';
@@ -220,6 +221,91 @@ program
 
     } catch (error) {
       getLogger().error('Fatal error: ' + (error instanceof Error ? error.message : String(error)));
+      process.exitCode = 1;
+    } finally {
+      if (client) {
+        await client.close();
+        getLogger().info('MongoDB connection closed');
+      }
+    }
+  });
+
+program
+  .command('compact')
+  .description('Compact collections to reclaim storage space')
+  .option('-u, --uri <uri>', 'MongoDB connection URI (or use MONGODB_URI env var)')
+  .option('-d, --database <name>', 'Database name (or use MONGODB_DATABASE env var)')
+  .option('--specified-collections <collections>', 'Comma-separated list of collections to process')
+  .option('--ignored-collections <collections>', 'Comma-separated list of collections to ignore')
+  .option('--min-savings-mb <mb>', 'Minimum space savings in MB to proceed (default 5000)', '5000')
+  .option('--tolerance-percent <percent>', 'Convergence tolerance as percentage (default 20)', '20')
+  .option('--min-convergence-size-mb <mb>', 'Minimum measurement size in MB to count toward convergence (default 5000)', '5000')
+  .option('--force-stepdown', 'Force primary stepDown for MongoDB <8.0')
+  .option('--stepdown-timeout <seconds>', 'Timeout in seconds for replSetStepDown (default 120)', '120')
+  .option('--auto-compact', 'Enable autoCompact after convergence for MongoDB 8.0+')
+  .action(async (options) => {
+    let client: MongoClient | null = null;
+
+    try {
+      // Initialize logger
+      setLogger(new ConsoleLogger(process.env.DEBUG === 'true'));
+
+      // Get and validate URI and database name
+      const uri = getAndValidateUri(options);
+      const dbName = getDbName(options);
+
+      // Connect to MongoDB
+      getLogger().info('Connecting to MongoDB...');
+      client = new MongoClient(uri);
+      await client.connect();
+      getLogger().info('✅ Connected to MongoDB');
+
+      const db = client.db(dbName);
+      let clusterName = getClusterName(client);
+      if (clusterName === 'unknown-cluster') {
+        clusterName = await getReplicaSetName(db);
+      }
+
+      // Build configuration
+      const config: CompactConfig = {
+        dbName,
+        clusterName,
+        logDir: options.logDir || DEFAULT_CONFIG.LOG_DIR,
+        runtimeDir: options.runtimeDir || DEFAULT_CONFIG.RUNTIME_DIR,
+        minSavingsMb: parseInt(options.minSavingsMb, 10) || 5000,
+        convergenceTolerance: (parseInt(options.tolerancePercent, 10) || 20) / 100,
+        minConvergenceSizeMb: parseInt(options.minConvergenceSizeMb, 10) || 5000,
+        forceStepdown: options.forceStepdown || false,
+        stepDownTimeoutSeconds: parseInt(options.stepdownTimeout, 10) || 120,
+        autoCompact: options.autoCompact || false,
+        safeRun: false
+      };
+
+      config.specifiedCollections = parseCommaSeparated(options.specifiedCollections);
+      config.ignoredCollections = parseCommaSeparated(options.ignoredCollections);
+
+      // Run the compact operation
+      const compactResult = await compactCollections(db, config);
+
+      if (compactResult.error) {
+        getLogger().error('Compact operation encountered errors: ' + compactResult.error);
+        process.exitCode = 1;
+      } else if (compactResult.warnings && compactResult.warnings.length > 0) {
+        getLogger().warn('Compact operation completed with warnings:');
+        compactResult.warnings.forEach((warning) => {
+          getLogger().warn(' - ' + warning);
+        });
+        process.exitCode = 0;
+      } else {
+        getLogger().info('\n✅ Compact operation completed successfully');
+        process.exitCode = 0;
+      }
+
+    } catch (error) {
+      getLogger().error('Fatal error: ' + (error instanceof Error ? error.message : String(error)));
+      if (error instanceof Error && error.stack) {
+        getLogger().error('Stack trace: ' + error.stack);
+      }
       process.exitCode = 1;
     } finally {
       if (client) {

@@ -10,6 +10,7 @@ import {
   IndexStat,
   IndexLog,
   CollectionLog,
+  DatabaseLog,
   IndexDocument,
   VALID_INDEX_OPTIONS,
   RebuildCoordinator
@@ -53,7 +54,8 @@ export async function rebuildCollectionIndexes(
   state: RebuildState,
   paths: RebuildPaths,
   config: RebuildConfig,
-  validOptions: string[] = VALID_INDEX_OPTIONS as unknown as string[]
+  validOptions: string[] = VALID_INDEX_OPTIONS as unknown as string[],
+  dbLog?: DatabaseLog
 ): Promise<{ status: string; log: CollectionLog }> {
   const collectionName = collection.collectionName;
   const collectionLog: CollectionLog = {
@@ -183,66 +185,133 @@ export async function rebuildCollectionIndexes(
         coveringOptions.partialFilterExpression = originalOptions.partialFilterExpression;
       }
 
-      getLogger().info(`  [1/6] Calling createIndex for covering index '${coveringName}'.`);
-      try {
-        await collection.createIndex(coveringKey, coveringOptions);
-      } catch (e) {
-        console.error(`  ❌ Failed to create covering index '${coveringName}': ${e instanceof Error ? e.message : String(e)}`);
+      // Retry logic wrapper
+      let attemptCount = 0;
+      let rebuildSuccess = false;
+      const maxAttempts = 2; // Initial attempt + 1 retry
+
+      while (attemptCount < maxAttempts && !rebuildSuccess) {
+        attemptCount++;
+        try {
+          if (attemptCount > 1) {
+            getLogger().warn(`  ⚠️  Retry attempt ${attemptCount - 1} for index "${originalName}"...`);
+          }
+
+          getLogger().info(`  [1/6] Calling createIndex for covering index '${coveringName}'.`);
+          await collection.createIndex(coveringKey, coveringOptions);
+          getLogger().info(`  -> Command completed.`);
+
+          getLogger().info(`  [2/6] Calling verifyIndex for covering index...`);
+          const expectedCoveringOptions: Record<string, any> = {};
+          if (coveringOptions.partialFilterExpression) {
+            expectedCoveringOptions.partialFilterExpression = coveringOptions.partialFilterExpression;
+          }
+          if (!await verifyIndex(collection, coveringName, coveringKey, expectedCoveringOptions)) {
+            throw new Error(`Safety check failure for covering index.`);
+          }
+
+          getLogger().info(`  [3/6] Calling dropIndex for old index '${originalName}'...`);
+          await collection.dropIndex(originalName);
+          getLogger().info(`  -> Command completed.`);
+
+          getLogger().info(`  [4/6] Calling createIndex for final index '${originalName}'. THIS IS THE MAIN BUILD.`);
+          await collection.createIndex(originalKey, {...originalOptions, name: originalName});
+          getLogger().info(`  -> Command completed.`);
+
+          getLogger().info(`  [5/6] Calling verifyIndex for final rebuilt index...`);
+          if (!await verifyIndex(collection, originalName, originalKey, originalOptions)) {
+            throw new Error(`CRITICAL: Final index '${originalName}' is invalid.`);
+          }
+
+          getLogger().info(`  [6/6] Calling dropIndex for covering index '${coveringName}'...`);
+          await collection.dropIndex(coveringName);
+          getLogger().info(`  -> Command completed.`);
+
+          // Success - record time and metrics
+          indexLog.timeSeconds = (new Date().getTime() - indexLog.startTime.getTime()) / 1000;
+          if (attemptCount > 1) {
+            indexLog.retries = attemptCount - 1;
+            getLogger().info(`  ✅ Succeeded after ${attemptCount - 1} retry attempt(s).`);
+          }
+          collectionLog.indexes[originalName] = indexLog;
+
+          if (!state.completed[collectionName]) {
+            state.completed[collectionName] = [];
+          }
+          state.completed[collectionName].push(originalName);
+          writeJsonFile(paths.stateFile, state);
+          getLogger().info(`  💾 State file updated.`);
+
+          // Notify coordinator that index rebuild is complete
+          await notifyCoordinator(
+            config.coordinator,
+            'onIndexComplete',
+            collectionName,
+            originalName,
+            indexLog.timeSeconds,
+            true
+          );
+
+          getLogger().info(`\n--- Rebuild for '${originalName}' complete in ${formatDuration(indexLog.timeSeconds)}. ---`);
+          rebuildSuccess = true;
+
+        } catch (e) {
+          const errorMsg = e instanceof Error ? e.message : String(e);
+          getLogger().error(`  ❌ Failed to rebuild index '${originalName}': ${errorMsg}`);
+
+          if (attemptCount < maxAttempts) {
+            getLogger().warn(`  ⚠️  Will retry once more...`);
+            // Clean up any partial state before retry
+            try {
+              const allIndexes = await collection.indexes();
+              if (allIndexes.find(i => i.name === coveringName)) {
+                getLogger().info(`  🧹 Cleaning up covering index before retry...`);
+                await collection.dropIndex(coveringName);
+              }
+            } catch (cleanupError) {
+              getLogger().debug(`  Cleanup error (non-critical): ${cleanupError}`);
+            }
+            // Small delay before retry
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          } else {
+            // Max retries exhausted - log and continue with other indexes
+            getLogger().error(`  ❌ Max retries exhausted for index '${originalName}'. Continuing with other indexes...`);
+
+            // Record the failure
+            indexLog.error = errorMsg;
+            indexLog.retries = attemptCount - 1;
+            indexLog.timeSeconds = (new Date().getTime() - indexLog.startTime.getTime()) / 1000;
+            collectionLog.indexes[originalName] = indexLog;
+
+            // Add warning to collection log
+            if (!collectionLog.warnings) {
+              collectionLog.warnings = [];
+            }
+            const warningMsg = `Failed to rebuild index "${originalName}" after ${attemptCount - 1} retry: ${errorMsg}`;
+            collectionLog.warnings.push(warningMsg);
+
+            // Add warning to database log if available
+            if (dbLog) {
+              dbLog.warnings.push(`Collection "${collectionName}", index "${originalName}": Failed after ${attemptCount - 1} retry - ${errorMsg}`);
+            }
+
+            // Log to console for immediate visibility
+            console.warn(`\n⚠️  WARNING: Failed to rebuild index "${originalName}" in collection "${collectionName}"`);
+            console.warn(`   Error: ${errorMsg}`);
+            console.warn(`   Retries attempted: ${attemptCount - 1}`);
+            console.warn(`   This index will be skipped. Manual intervention may be required.\n`);
+
+            if (e instanceof Error && e.stack) {
+              getLogger().debug(`  Stack trace: ${e.stack}`);
+            }
+          }
+        }
       }
-      getLogger().info(`  -> Command completed.`);
-
-      getLogger().info(`  [2/6] Calling verifyIndex for covering index...`);
-      const expectedCoveringOptions: Record<string, any> = {};
-      if (coveringOptions.partialFilterExpression) {
-        expectedCoveringOptions.partialFilterExpression = coveringOptions.partialFilterExpression;
-      }
-      if (!await verifyIndex(collection, coveringName, coveringKey, expectedCoveringOptions)) {
-        throw new Error(`Safety check failure for covering index.`);
-      }
-
-      getLogger().info(`  [3/6] Calling dropIndex for old index '${originalName}'...`);
-      await collection.dropIndex(originalName);
-      getLogger().info(`  -> Command completed.`);
-
-      getLogger().info(`  [4/6] Calling createIndex for final index '${originalName}'. THIS IS THE MAIN BUILD.`);
-      await collection.createIndex(originalKey, {...originalOptions, name: originalName});
-      getLogger().info(`  -> Command completed.`);
-
-      getLogger().info(`  [5/6] Calling verifyIndex for final rebuilt index...`);
-      if (!await verifyIndex(collection, originalName, originalKey, originalOptions)) {
-        throw new Error(`CRITICAL: Final index '${originalName}' is invalid.`);
-      }
-
-      getLogger().info(`  [6/6] Calling dropIndex for covering index '${coveringName}'...`);
-      await collection.dropIndex(coveringName);
-      getLogger().info(`  -> Command completed.`);
-
-      // Record time, but defer size measurement to the end (Rebuild-Then-Measure strategy)
-      indexLog.timeSeconds = (new Date().getTime() - indexLog.startTime.getTime()) / 1000;
-      collectionLog.indexes[originalName] = indexLog;
-
-      if (!state.completed[collectionName]) {
-        state.completed[collectionName] = [];
-      }
-      state.completed[collectionName].push(originalName);
-      writeJsonFile(paths.stateFile, state);
-      getLogger().info(`  💾 State file updated.`);
-
-      // Notify coordinator that index rebuild is complete
-      await notifyCoordinator(
-        config.coordinator,
-        'onIndexComplete',
-        collectionName,
-        originalName,
-        indexLog.timeSeconds,
-        true
-      );
-
-      getLogger().info(`\n--- Rebuild for '${originalName}' complete in ${formatDuration(indexLog.timeSeconds)}. ---`);
-    } catch (e) {
-      console.error(`❌ Error processing index  ${e instanceof Error ? e.message : String(e)}`);
-      if (e instanceof Error && e.stack) {
-        console.error('Stack: ' + e.stack);
+    } catch (outerError) {
+      // This catches any unexpected errors outside the retry loop
+      console.error(`❌ Unexpected error processing index: ${outerError instanceof Error ? outerError.message : String(outerError)}`);
+      if (outerError instanceof Error && outerError.stack) {
+        console.error('Stack: ' + outerError.stack);
       }
     }
   }

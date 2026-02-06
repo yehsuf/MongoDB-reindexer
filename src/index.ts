@@ -257,7 +257,8 @@ export async function rebuildIndexes(db: Db, config: RebuildConfig): Promise<Dat
         state,
         paths,
         fullConfig,
-        validOptions
+        validOptions,
+        dbLog
       );
 
       if (result.status !== 'skipped') {
@@ -336,8 +337,9 @@ export async function rebuildIndexes(db: Db, config: RebuildConfig): Promise<Dat
 }
 
 export { cleanupOrphanedIndexes };
+export { compactCollections } from './compact-operations.js';
 export { ConsoleLogger, SilentLogger, getLogger, setLogger } from './logger.js';
 export type { ILogger } from './logger.js';
-export type { RebuildCoordinator } from './types.js';
+export type { RebuildCoordinator, CompactConfig, CompactDatabaseLog, CollectionCompactLog } from './types.js';
 export { detectServerVersion, getValidOptionsForVersion, filterIndexOptions } from './version-detection.js';
 export type { ServerVersionInfo } from './version-detection.js';

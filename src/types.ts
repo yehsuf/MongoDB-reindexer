@@ -88,6 +88,10 @@ export interface IndexLog {
   initialSizeMb: number;
   /** Final size in MB */
   finalSizeMb: number;
+  /** Error message if rebuild failed */
+  error?: string;
+  /** Number of retry attempts */
+  retries?: number;
 }
 
 /**
@@ -106,6 +110,8 @@ export interface CollectionLog {
   reclaimedMb: number;
   /** Logs for individual indexes */
   indexes: Record<string, IndexLog>;
+  /** Warnings encountered during rebuild */
+  warnings?: string[];
 }
 
 /**
@@ -271,4 +277,117 @@ export interface RebuildCoordinator {
    * @param context - Additional context (collection, index, etc.)
    */
   onError?(message: string, context: Record<string, any>): Promise<void> | void;
+}
+
+/**
+ * Configuration for the MongoDB collection compact operation
+ */
+export interface CompactConfig extends RebuildConfig {
+  /** Minimum space savings in MB to proceed with compaction (default 5000) */
+  minSavingsMb?: number;
+
+  /** Convergence tolerance as decimal (default 0.20 = ±20%) */
+  convergenceTolerance?: number;
+
+  /** Minimum measurement size in bytes to count toward convergence (default 5000000000 = 5GB) */
+  minConvergenceSizeMb?: number;
+
+  /** Force primary stepDown for MongoDB <8.0 (default false, auto-enabled for <8.0) */
+  forceStepdown?: boolean;
+
+  /** Enable autoCompact after convergence for MongoDB 8.0+ (default false) */
+  autoCompact?: boolean;
+
+  /** Timeout in seconds for replSetStepDown command (default 120) */
+  stepDownTimeoutSeconds?: number;
+}
+
+/**
+ * Error/retry record for compact operation
+ */
+export interface CompactErrorRecord {
+  /** Iteration number where error occurred */
+  iteration: number;
+
+  /** Error message */
+  error: string;
+
+  /** Whether retry succeeded */
+  retrySucceeded: boolean;
+
+  /** Fallback command used (e.g., "compact without dryRun") */
+  fallback?: string;
+}
+
+/**
+ * Performance log for a collection compact operation
+ */
+export interface CollectionCompactLog {
+  /** Start time of compact operation */
+  startTime: Date;
+
+  /** Total time in seconds */
+  totalTimeSeconds: number;
+
+  /** Estimated space savings in MB (from dryRun or freeSpaceTargetMB) */
+  estimatedSavingsMb: number;
+
+  /** Array of actual measurement sizes in bytes from each iteration */
+  measurements: number[];
+
+  /** Whether convergence was detected */
+  converged: boolean;
+
+  /** Final measurement size in MB */
+  finalMeasurementMb: number;
+
+  /** Number of iterations performed */
+  iterations: number;
+
+  /** Whether primary was stepped down (for <v8) */
+  steppedDown?: boolean;
+
+  /** Error/retry records */
+  errors: CompactErrorRecord[];
+
+  /** Whether autoCompact was enabled (for v8+) */
+  autoCompactEnabled?: boolean;
+
+  /** Whether autoCompact saw primary size reduction */
+  autoCompactReducedSize?: boolean;
+}
+
+/**
+ * Performance log for entire database compact operation
+ */
+export interface CompactDatabaseLog {
+  /** Cluster name */
+  clusterName: string;
+
+  /** Database name */
+  dbName: string;
+
+  /** MongoDB version */
+  mongoVersion: string;
+
+  /** Start time ISO string */
+  startTime: string;
+
+  /** Total time in seconds */
+  totalTimeSeconds: number;
+
+  /** MongoDB version sufficient for autoCompact */
+  supportsAutoCompact: boolean;
+
+  /** Primary was stepped down during operation */
+  steppedDown: boolean;
+
+  /** Logs for individual collections */
+  collections: Record<string, CollectionCompactLog>;
+
+  /** Warnings encountered */
+  warnings: string[];
+
+  /** Error message if any */
+  error?: string;
 }
