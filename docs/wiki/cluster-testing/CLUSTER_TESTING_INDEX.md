@@ -161,7 +161,7 @@ MONGODB_TEST_URI="mongodb://testuser:testpass@localhost:27017" npm test
 │   ├── qa-cluster-test.sh                     ← QA wrapper
 │   ├── qa-cluster-validation.sh               ← Validation script
 │   └── test-with-env.sh                       ← Environment helper
-├── docs/cluster-testing/
+├── docs/wiki/cluster-testing/
 │   ├── CLUSTER_TESTING_INDEX.md           ← This file
 │   ├── CLUSTER_TESTING_GUIDE.md           ← Complete guide
 │   ├── LIVE_TESTING_GUIDE.md

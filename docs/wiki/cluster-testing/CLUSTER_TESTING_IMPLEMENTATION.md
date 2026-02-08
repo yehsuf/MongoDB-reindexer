@@ -232,7 +232,7 @@ mongosh "$MONGODB_TEST_URI" --eval "db.version()"
 ## Files Created
 
 - `CLUSTER_TESTING_QUICKSTART.md` - Quick setup guide
-- `docs/CLUSTER_TESTING_GUIDE.md` - Comprehensive testing guide
+- `docs/wiki/cluster-testing/CLUSTER_TESTING_GUIDE.md` - Comprehensive testing guide
 - `scripts/run-cluster-tests.sh` - Master test runner (both modes)
 - `scripts/test-cli-mode.sh` - CLI mode test script
 - `.github/agents/qa-lead.agent.md` - Updated with cluster testing instructions

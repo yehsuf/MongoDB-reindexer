@@ -28,7 +28,7 @@ A practical guide for testing MongoDB Reindexer in real-world scenarios with liv
 
 ```bash
 # Clone the repository
-git clone https://github.com/yehsuf/MongoDB-reindexer.git
+git clone https://github.com/<org>/<repo>.git
 cd MongoDB-reindexer
 
 # Install dependencies
@@ -724,7 +724,7 @@ rm -rf .rebuild_runtime/
 ## Support
 
 For issues and questions:
-- Open an issue on [GitHub](https://github.com/yehsuf/MongoDB-reindexer/issues)
+- Open an issue on [GitHub](https://github.com/<org>/<repo>/issues)
 - Review existing documentation
 - Check troubleshooting section above
 

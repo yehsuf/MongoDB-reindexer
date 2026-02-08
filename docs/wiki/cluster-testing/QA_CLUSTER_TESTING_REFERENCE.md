@@ -193,7 +193,7 @@ MONGODB_TEST_URI="$MONGODB_TEST_URI" npm test -- --timeout 60000
 
 **Documentation:**
 - `CLUSTER_TESTING_QUICKSTART.md` - 5-min setup
-- `docs/CLUSTER_TESTING_GUIDE.md` - Full guide
+- `docs/wiki/cluster-testing/CLUSTER_TESTING_GUIDE.md` - Full guide
 - `CLUSTER_TESTING_IMPLEMENTATION.md` - Details
 
 ---

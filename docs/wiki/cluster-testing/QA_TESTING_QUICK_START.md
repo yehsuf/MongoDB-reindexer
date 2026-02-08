@@ -51,7 +51,7 @@ Your QA cluster testing workflow is now ready to use!
 ```bash
 # Pre-approval validation
 ./qa-cluster-validation.sh \
-  "mongodb+srv://ysufrin:JveCuxtCSvhfdjI7@pi-dev-2020-0420-124919.yxwnk.mongodb.net" \
+  "mongodb+srv://<username>:<password>@<cluster-host>/<database>" \
   "firewall"
 
 # Review the report
@@ -59,7 +59,7 @@ cat .agent_memory/qa_validation_*.md
 
 # If approved, run tests
 ./qa-cluster-test.sh \
-  "mongodb+srv://ysufrin:JveCuxtCSvhfdjI7@pi-dev-2020-0420-124919.yxwnk.mongodb.net" \
+  "mongodb+srv://<username>:<password>@<cluster-host>/<database>" \
   "firewall"
 
 # Review results
