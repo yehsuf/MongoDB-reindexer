@@ -17,7 +17,7 @@ You can now run **both CLI and NPM modes** against your test cluster using autom
 
 ### 2. Documentation
 - **`CLUSTER_TESTING_QUICKSTART.md`** - 5-minute setup
-- **`docs/CLUSTER_TESTING_GUIDE.md`** - Complete guide
+- **`docs/wiki/cluster-testing/CLUSTER_TESTING_GUIDE.md`** - Complete guide
 - **`CLUSTER_TESTING_IMPLEMENTATION.md`** - Implementation details
 - **`QA_CLUSTER_TESTING_REFERENCE.md`** - QA agent reference card
 - **README.md updated** - Testing section with cluster testing info
@@ -212,7 +212,7 @@ Project Root
 ## Need Help?
 
 - **Quick start**: `CLUSTER_TESTING_QUICKSTART.md`
-- **Full details**: `docs/CLUSTER_TESTING_GUIDE.md`
+- **Full details**: `docs/wiki/cluster-testing/CLUSTER_TESTING_GUIDE.md`
 - **QA agent**: `QA_CLUSTER_TESTING_REFERENCE.md`
 - **Implementation**: `CLUSTER_TESTING_IMPLEMENTATION.md`
 - **Agent instructions**: `.github/agents/qa-lead.agent.md` (CLUSTER TESTING section)

@@ -9,7 +9,7 @@ Implementation of cluster testing infrastructure allowing QA agent to run both C
 
 ### Documentation Files
 
-#### `docs/cluster-testing/CLUSTER_TESTING_QUICKSTART.md`
+#### `docs/wiki/cluster-testing/CLUSTER_TESTING_QUICKSTART.md`
 - **Purpose**: 5-minute quick start guide
 - **Content**: 
   - Docker setup (recommended)
@@ -18,7 +18,7 @@ Implementation of cluster testing infrastructure allowing QA agent to run both C
   - Build and verification steps
   - Troubleshooting
 
-#### `docs/cluster-testing/CLUSTER_TESTING_GUIDE.md`
+#### `docs/wiki/cluster-testing/CLUSTER_TESTING_GUIDE.md`
 - **Purpose**: Comprehensive testing procedures
 - **Content**:
   - Table of contents
@@ -31,7 +31,7 @@ Implementation of cluster testing infrastructure allowing QA agent to run both C
   - Troubleshooting
   - Best practices
 
-#### `docs/cluster-testing/CLUSTER_TESTING_IMPLEMENTATION.md`
+#### `docs/wiki/cluster-testing/CLUSTER_TESTING_IMPLEMENTATION.md`
 - **Purpose**: Implementation details and overview
 - **Content**:
   - What was added overview
@@ -44,7 +44,7 @@ Implementation of cluster testing infrastructure allowing QA agent to run both C
   - Troubleshooting
   - Best practices
 
-#### `docs/cluster-testing/QA_CLUSTER_TESTING_REFERENCE.md`
+#### `docs/wiki/cluster-testing/QA_CLUSTER_TESTING_REFERENCE.md`
 - **Purpose**: QA agent quick reference card
 - **Content**:
   - When to use cluster tests
@@ -57,7 +57,7 @@ Implementation of cluster testing infrastructure allowing QA agent to run both C
   - Verification checklist
   - Common scenarios
 
-#### `docs/cluster-testing/SOLUTION_SUMMARY.md`
+#### `docs/wiki/cluster-testing/SOLUTION_SUMMARY.md`
 - **Purpose**: High-level solution summary
 - **Content**:
   - Question answered
@@ -176,7 +176,7 @@ MongoDB-reindexer.git/
 
 ### Path 2: Full Understanding (30 minutes)
 1. Read: `CLUSTER_TESTING_QUICKSTART.md`
-2. Read: `docs/CLUSTER_TESTING_GUIDE.md`
+2. Read: `docs/wiki/cluster-testing/CLUSTER_TESTING_GUIDE.md`
 3. Read: `CLUSTER_TESTING_IMPLEMENTATION.md`
 4. Run: All three test modes
 
@@ -227,7 +227,7 @@ MongoDB-reindexer.git/
 
 ### Documentation Directory
 ```
-./docs/cluster-testing/
+./docs/wiki/cluster-testing/
 ├── CLUSTER_TESTING_QUICKSTART.md
 ├── CLUSTER_TESTING_IMPLEMENTATION.md
 ├── QA_CLUSTER_TESTING_REFERENCE.md
@@ -388,10 +388,10 @@ MONGODB_TEST_URI="..." npm test -- --timeout 60000
 ## Support Files
 
 For more details, see:
-- Quick start: `docs/cluster-testing/CLUSTER_TESTING_QUICKSTART.md`
-- Complete guide: `docs/cluster-testing/CLUSTER_TESTING_GUIDE.md`
-- Agent reference: `docs/cluster-testing/QA_CLUSTER_TESTING_REFERENCE.md`
-- Implementation: `docs/cluster-testing/CLUSTER_TESTING_IMPLEMENTATION.md`
+- Quick start: `docs/wiki/cluster-testing/CLUSTER_TESTING_QUICKSTART.md`
+- Complete guide: `docs/wiki/cluster-testing/CLUSTER_TESTING_GUIDE.md`
+- Agent reference: `docs/wiki/cluster-testing/QA_CLUSTER_TESTING_REFERENCE.md`
+- Implementation: `docs/wiki/cluster-testing/CLUSTER_TESTING_IMPLEMENTATION.md`
 - Agent instructions: `.github/agents/qa-lead.agent.md`
 - README: `README.md` (Testing section)
 
