@@ -237,7 +237,10 @@ program
   .option('--min-convergence-size-mb <mb>', 'Minimum measurement size in MB to count toward convergence (default 5000)', '5000')
   .option('--force-stepdown', 'Force primary stepDown for MongoDB <8.0')
   .option('--stepdown-timeout <seconds>', 'Timeout in seconds for replSetStepDown (default 120)', '120')
-  .option('--auto-compact', 'Enable autoCompact after convergence for MongoDB 8.0+')
+  .option(
+    '--no-auto-compact',
+    'Disable autoCompact for MongoDB 8.0+ (manual compact only)'
+  )
   .action(async (options) => {
     let client: MongoClient | null = null;
 
