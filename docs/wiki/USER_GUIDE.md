@@ -91,6 +91,24 @@ mongodb-reindex rebuild \
 - `-d, --database <name>` - Database name (required)
 - `--cover-suffix <suffix>` - Suffix for covering indexes (default: `_cover_temp`)
 
+**compact command:**
+- `-u, --uri <uri>` - MongoDB connection URI (or use MONGODB_URI env var)
+- `-d, --database <name>` - Database name (required)
+- `--specified-collections <collections>` - Comma-separated list of collections to process
+- `--ignored-collections <collections>` - Comma-separated list of collections to ignore (supports wildcards)
+- `--min-savings-mb <mb>` - Minimum space savings in MB to proceed (default 5000)
+- `--tolerance-percent <percent>` - Convergence tolerance as percentage (default 20)
+- `--min-convergence-size-mb <mb>` - Minimum measurement size in MB to count toward convergence (default 5000)
+- `--force-stepdown` - Force primary stepDown for MongoDB <8.0
+- `--stepdown-timeout <seconds>` - Timeout in seconds for replSetStepDown (default 120)
+- `--no-auto-compact` - Disable autoCompact for MongoDB 8.0+ (manual compact only)
+
+#### Compact Behavior Notes
+
+- For MongoDB 8.0+, autoCompact is enabled by default. It runs the `autoCompact` command on the primary and on distinct secondary targets (using `availabilityZone` replica set tags when available) and skips manual compact. Use `--no-auto-compact` to force manual compact.
+- For MongoDB versions that do not support `autoCompact`, the tool runs manual `compact` on distinct secondary targets, never on the primary. 
+- If the replica set has fewer than two distinct secondary targets, the tool continues with available nodes and logs a warning.
+
 ### As a Library
 
 The library function accepts an existing `Db` instance, allowing you to use it within your application's existing MongoDB connection.

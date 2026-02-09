@@ -172,4 +172,140 @@ describe('Compact Operations Module', () => {
       });
     });
   });
+
+  describe('Compact Execution Flow', () => {
+    const storageSizeBytes = 6000 * 1024 * 1024;
+    const dataSizeBytes = 1000 * 1024 * 1024;
+
+    const createFakeDb = (options: {
+      version: string;
+      members: Array<{ _id: number; host: string; tags: Record<string, string> }>;
+    }) => {
+      const commandCalls: Array<{ cmd: any; options?: any }> = [];
+      const adminCalls: Array<{ cmd: any; options?: any }> = [];
+      let stepdownTriggered = false;
+
+      const db = {
+        listCollections: () => ({
+          toArray: async () => [{ name: 'testCollection' }]
+        }),
+        command: async (cmd: any, cmdOptions?: any) => {
+          commandCalls.push({ cmd, options: cmdOptions });
+          if (cmd.compact) {
+            return { ok: 1 };
+          }
+          if (cmd.collStats) {
+            return { storageSize: storageSizeBytes, size: dataSizeBytes };
+          }
+          if (cmd.autoCompact !== undefined) {
+            return { ok: 1 };
+          }
+          return { ok: 1 };
+        },
+        admin: () => ({
+          command: async (cmd: any, cmdOptions?: any) => {
+            adminCalls.push({ cmd, options: cmdOptions });
+            if (cmd.buildInfo) {
+              return { version: options.version };
+            }
+            if (cmd.replSetGetConfig) {
+              return { config: { members: options.members } };
+            }
+            if (cmd.replSetGetStatus) {
+              if (stepdownTriggered) {
+                return {
+                  members: options.members.map(member => ({
+                    _id: member._id,
+                    state: 2
+                  }))
+                };
+              }
+              return {
+                members: options.members.map(member => ({
+                  _id: member._id,
+                  state: member._id === 0 ? 1 : 2
+                }))
+              };
+            }
+            if (cmd.replSetStepDown) {
+              stepdownTriggered = true;
+              return { ok: 1 };
+            }
+            if (cmd.hello) {
+              return { secondary: true };
+            }
+            if (cmd.currentOp) {
+              return { inprog: [] };
+            }
+            return { ok: 1 };
+          }
+        })
+      };
+
+      return { db, commandCalls, adminCalls };
+    };
+
+    it('should target tagged secondaries for manual compact', async () => {
+      const members = [
+        { _id: 0, host: 'primary', tags: { availabilityZone: 'zone-a' } },
+        { _id: 1, host: 'secondary1', tags: { availabilityZone: 'zone-b' } },
+        { _id: 2, host: 'secondary2', tags: { availabilityZone: 'zone-c' } }
+      ];
+      const { db, commandCalls } = createFakeDb({
+        version: '7.0.0',
+        members
+      });
+
+      await compactCollections(db as any, {
+        dbName: 'testdb',
+        clusterName: 'test-cluster',
+        minSavingsMb: 1000,
+        convergenceTolerance: 0.2,
+        minConvergenceSizeMb: 1000,
+        forceStepdown: false,
+        stepDownTimeoutSeconds: 5,
+        autoCompact: false,
+        safeRun: false
+      });
+
+      const compactCalls = commandCalls.filter(call => call.cmd.compact);
+      const zones = new Set(
+        compactCalls.map(call => call.options?.readPreference?.tags?.[0]?.availabilityZone)
+      );
+
+      assert.ok(zones.has('zone-b'));
+      assert.ok(zones.has('zone-c'));
+    });
+
+    it('should prefer prior primary zone after stepdown', async () => {
+      const members = [
+        { _id: 0, host: 'primary', tags: { availabilityZone: 'zone-a' } },
+        { _id: 1, host: 'secondary1', tags: { availabilityZone: 'zone-b' } },
+        { _id: 2, host: 'secondary2', tags: { availabilityZone: 'zone-c' } }
+      ];
+      const { db, commandCalls } = createFakeDb({
+        version: '7.0.0',
+        members
+      });
+
+      await compactCollections(db as any, {
+        dbName: 'testdb',
+        clusterName: 'test-cluster',
+        minSavingsMb: 1000,
+        convergenceTolerance: 0.2,
+        minConvergenceSizeMb: 1000,
+        forceStepdown: true,
+        stepDownTimeoutSeconds: 5,
+        autoCompact: false,
+        safeRun: false
+      });
+
+      const compactCalls = commandCalls.filter(call => call.cmd.compact);
+      const zones = new Set(
+        compactCalls.map(call => call.options?.readPreference?.tags?.[0]?.availabilityZone)
+      );
+
+      assert.ok(zones.has('zone-a'));
+    });
+  });
 });
