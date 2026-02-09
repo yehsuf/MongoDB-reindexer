@@ -1,0 +1,6 @@
+{
+  "defaultLocale": "en",
+  "supportedLocales": ["en"],
+  "fallbackLocale": "en",
+  "description": "Localization configuration for MongoDB Reindexer"
+}

@@ -641,21 +641,21 @@ Modern MongoDB query optimizers are highly effective and often select better ind
 
 ### Testing Resources
 
-- **[Live Testing Guide](docs/cluster-testing/LIVE_TESTING_GUIDE.md)** - Practical guide for testing with live MongoDB instances
+- **[Live Testing Guide](docs/wiki/cluster-testing/LIVE_TESTING_GUIDE.md)** - Practical guide for testing with live MongoDB instances
   - Quick start guide
   - Test scenarios (basic rebuild, filtering, wildcards, TTL, performance testing)
   - Validation procedures
   - Troubleshooting common issues
   - Cleanup procedures
 
-- **[Cluster Testing Guide](docs/cluster-testing/CLUSTER_TESTING_GUIDE.md)** - Test both CLI and NPM modes against MongoDB test cluster
+- **[Cluster Testing Guide](docs/wiki/cluster-testing/CLUSTER_TESTING_GUIDE.md)** - Test both CLI and NPM modes against MongoDB test cluster
   - Test cluster setup with sample data
   - CLI mode direct execution
   - NPM mode integration tests
   - Automated test execution for CI/CD
   - Result logging and verification
 
-- **[Cluster Testing Quick Start](docs/cluster-testing/CLUSTER_TESTING_QUICKSTART.md)** - Get started in 5 minutes
+- **[Cluster Testing Quick Start](docs/wiki/cluster-testing/CLUSTER_TESTING_QUICKSTART.md)** - Get started in 5 minutes
   - Docker setup (recommended)
   - Local MongoDB setup
   - Environment configuration
