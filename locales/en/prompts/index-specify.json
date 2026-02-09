@@ -1,0 +1,19 @@
+{
+  "id": "index-specify",
+  "question": "Process index?",
+  "options": [
+    {
+      "value": "yes",
+      "shortcut": "y",
+      "description": "Rebuild this index using Cover-Swap-Cleanup",
+      "details": "Creates a covering index, drops the old one, creates the final index, and removes the covering index"
+    },
+    {
+      "value": "no",
+      "shortcut": "n",
+      "description": "Skip this index and continue to the next one",
+      "details": "Leaves this index as-is and proceeds to the next index in the collection"
+    }
+  ],
+  "context": "This prompt appears when you selected 'specify' mode for indexes. The Cover-Swap-Cleanup process takes 6 steps per index."
+}

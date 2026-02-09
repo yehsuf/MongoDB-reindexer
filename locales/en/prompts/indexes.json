@@ -1,0 +1,31 @@
+{
+  "id": "indexes-proceed",
+  "question": "Proceed with these indexes?",
+  "options": [
+    {
+      "value": "yes",
+      "shortcut": "y",
+      "description": "Rebuild all listed indexes in this collection",
+      "details": "Uses the Cover-Swap-Cleanup strategy to rebuild each index with zero downtime"
+    },
+    {
+      "value": "no",
+      "shortcut": "n",
+      "description": "Abort the entire rebuild operation",
+      "details": "Exits the rebuild process. All progress is saved to the state file."
+    },
+    {
+      "value": "specify",
+      "shortcut": "s",
+      "description": "Interactively choose which indexes to rebuild",
+      "details": "Shows a prompt for each index, allowing selective rebuilding"
+    },
+    {
+      "value": "back",
+      "shortcut": "b",
+      "description": "Skip this collection and move to the next one",
+      "details": "Skips all indexes in this collection and continues to the next collection"
+    }
+  ],
+  "context": "Indexes are sorted by size (largest first). Only non-unique indexes are shown. The _id_ index is always excluded."
+}
