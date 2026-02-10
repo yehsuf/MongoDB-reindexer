@@ -232,11 +232,11 @@ program
   .option('-d, --database <name>', 'Database name (or use MONGODB_DATABASE env var)')
   .option('--specified-collections <collections>', 'Comma-separated list of collections to process')
   .option('--ignored-collections <collections>', 'Comma-separated list of collections to ignore')
-  .option('--min-savings-mb <mb>', 'Minimum space savings in MB to proceed (default 5000)', '5000')
-  .option('--tolerance-percent <percent>', 'Convergence tolerance as percentage (default 20)', '20')
-  .option('--min-convergence-size-mb <mb>', 'Minimum measurement size in MB to count toward convergence (default 5000)', '5000')
+  .option('--min-savings-mb <mb>', 'Minimum space savings in MB to proceed', '5000')
+  .option('--tolerance-percent <percent>', 'Convergence tolerance as percentage', '20')
+  .option('--min-convergence-size-mb <mb>', 'Minimum measurement size in MB to count toward convergence', '5000')
   .option('--force-stepdown', 'Force primary stepDown for MongoDB <8.0')
-  .option('--stepdown-timeout <seconds>', 'Timeout in seconds for replSetStepDown (default 120)', '120')
+  .option('--stepdown-timeout <seconds>', 'Timeout in seconds for replSetStepDown', '120')
   .option(
     '--no-auto-compact',
     'Disable autoCompact for MongoDB 8.0+ (manual compact only)'
