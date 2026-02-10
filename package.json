@@ -1,6 +1,6 @@
 {
   "name": "mongodb-reindexer",
-  "version": "1.0.0-rc3",
+  "version": "1.0.0-rc4",
   "description": "Zero-downtime MongoDB index rebuilding with Cover-Swap-Cleanup strategy",
   "type": "module",
   "main": "./dist/index.js",
