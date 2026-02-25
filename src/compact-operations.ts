@@ -116,7 +116,7 @@ async function getSecondaryTargets(
   const statusById = new Map(statusMembers.map((member: any) => [member._id, member]));
 
   const targets: SecondaryTarget[] = [];
-  const seenZones = new Set<string>();
+  const seenHosts = new Set<string>();
 
   for (const member of configMembers) {
     const status = statusById.get(member._id);
@@ -125,13 +125,14 @@ async function getSecondaryTargets(
     }
 
     const availabilityZone = member.tags?.[AVAILABILITY_ZONE_TAG];
-    const zoneKey = availabilityZone || member.host || `member-${member._id}`;
+    const hostKey = member.host || `member-${member._id}`;
+    const zoneKey = availabilityZone || hostKey;
 
-    if (seenZones.has(zoneKey)) {
+    if (seenHosts.has(hostKey)) {
       continue;
     }
 
-    seenZones.add(zoneKey);
+    seenHosts.add(hostKey);
 
     const readPreference: ReadPreferenceOptions = availabilityZone
       ? { mode: 'secondary', tags: [{ [AVAILABILITY_ZONE_TAG]: availabilityZone }] }
@@ -201,7 +202,6 @@ export async function compactCollections(
     const minConvergenceSizeMb = config.minConvergenceSizeMb ?? 5000;
     const stepDownTimeoutSeconds = config.stepDownTimeoutSeconds ?? 120;
     const forceStepdown = config.forceStepdown ?? (serverVersion.major < 8);
-    const enableAutoCompact = config.autoCompact ?? (serverVersion.major >= 8);
 
     getLogger().info(`-> Min savings threshold: ${minSavingsMb}MB`);
     getLogger().info(`-> Convergence tolerance: ±${(convergenceTolerance * 100).toFixed(0)}%`);
@@ -228,6 +228,47 @@ export async function compactCollections(
 
     getLogger().info(`Found ${collectionsToProcess.length} collection(s) to process`);
     collectionsToProcess.forEach(name => getLogger().info(`  - ${name}`));
+
+    // Check for filter-aware logic
+    const hasFilters = 
+      (config.specifiedCollections && config.specifiedCollections.length > 0) ||
+      (config.ignoredCollections && config.ignoredCollections.length > 0);
+    
+    const forceManualCompact = config.forceManualCompact ?? false;
+    let enableAutoCompact = config.autoCompact ?? (serverVersion.major >= 8);
+
+    // Handle filter-aware logic for autoCompact
+    if (serverVersion.major >= 8 && enableAutoCompact && !forceManualCompact && hasFilters) {
+      if (config.safeRun) {
+        // Interactive mode: prompt user
+        getLogger().warn('\n⚠️  Collection filters provided, but autoCompact is node-wide (affects ALL collections).');
+        getLogger().info('Options:');
+        getLogger().info('  (y) Use manual compact instead (honors your filters)');
+        getLogger().info('  (n) Proceed with autoCompact anyway (filters will be ignored)');
+        
+        const { promptUser } = await import('./prompts.js');
+        const [choice] = await promptUser(
+          'Use manual compact instead? (y/n): ',
+          ['yes', 'no']
+        );
+        
+        if (choice === 'y') {
+          getLogger().info('Using manual compact to honor collection filters.');
+          enableAutoCompact = false;
+        } else {
+          getLogger().warn('Proceeding with autoCompact - collection filters will be ignored.');
+        }
+      } else {
+        // Non-interactive mode: auto-select manual compact
+        getLogger().warn('⚠️  Collection filters provided. Defaulting to manual compact (non-interactive mode).');
+        enableAutoCompact = false;
+      }
+    }
+
+    if (forceManualCompact && serverVersion.major >= 8) {
+      getLogger().info('--force-manual-compact flag set. Using manual compact.');
+      enableAutoCompact = false;
+    }
 
     const useAutoCompactOnly = serverVersion.major >= 8 && enableAutoCompact;
 
@@ -287,6 +328,8 @@ export async function compactCollections(
     // Phase 5: Handle autoCompact for v8+
     if (serverVersion.major >= 8 && enableAutoCompact) {
       getLogger().info('\n--- Phase 5: Enabling autoCompact (MongoDB 8.0+) ---');
+      getLogger().info('autoCompact is a node-level operation that compacts ALL collections on each node.');
+      
       const secondaryTargets = await getSecondaryTargets(db);
       if (secondaryTargets.length < 2) {
         const warning = 'Fewer than 2 distinct secondary targets found. AutoCompact will run on available nodes only.';
@@ -294,17 +337,32 @@ export async function compactCollections(
         getLogger().warn(`⚠️  ${warning}`);
       }
 
+      // Run autoCompact on primary first
+      const primarySuccess = await runAutoCompactOnNode(db, 'primary');
+      if (primarySuccess) {
+        getLogger().info('✅ AutoCompact completed on primary');
+      } else {
+        getLogger().warn('⚠️  AutoCompact did not complete successfully on primary');
+      }
+
+      // Run autoCompact on each distinct secondary
+      for (const target of secondaryTargets) {
+        const secondarySuccess = await runAutoCompactOnNode(db, target.zone, target.readPreference);
+        if (secondarySuccess) {
+          getLogger().info(`✅ AutoCompact completed on ${target.zone}`);
+        } else {
+          getLogger().warn(`⚠️  AutoCompact did not complete successfully on ${target.zone}`);
+        }
+      }
+
+      // Mark all collections as having autoCompact enabled
       for (const collectionName of collectionsToProcess) {
-        const collectionLog = dbLog.collections[collectionName];
-        const autoCompactSuccess = await enableAndMonitorAutoCompact(
-          db,
-          collectionName,
-          secondaryTargets
-        );
+        const collectionLog = dbLog.collections[collectionName] || createCollectionLog();
         collectionLog.autoCompactEnabled = true;
-        collectionLog.autoCompactReducedSize = autoCompactSuccess;
+        collectionLog.autoCompactReducedSize = primarySuccess;
         collectionLog.totalTimeSeconds =
           (new Date().getTime() - collectionLog.startTime.getTime()) / 1000;
+        dbLog.collections[collectionName] = collectionLog;
       }
     }
 
@@ -676,7 +734,7 @@ async function getCollectionSize(
     );
 
     // Return total storage size in MB
-    const sizeBytes = stats.storageSize || stats.size || 0;
+    const sizeBytes = stats.storageSize ?? 0;
     return bytesToMB(sizeBytes);
   } catch (error) {
     getLogger().debug(`Failed to get collection size for ${collectionName}: ${error}`);
@@ -769,96 +827,62 @@ async function performPrimaryStepDown(
 }
 
 /**
- * Enable autoCompact and monitor for size reduction on primary and secondaries
+ * Run autoCompact on a single node (primary or secondary)
+ * autoCompact is a node-level admin command that compacts ALL collections on the node
  */
-async function enableAndMonitorAutoCompact(
+async function runAutoCompactOnNode(
   db: Db,
-  collectionName: string,
-  secondaryTargets: SecondaryTarget[]
-): Promise<boolean> {
-  try {
-    let reduced = false;
-
-    reduced =
-      (await runAutoCompactOnTarget(db, collectionName, 'primary')) || reduced;
-
-    for (const target of secondaryTargets) {
-      reduced =
-        (await runAutoCompactOnTarget(db, collectionName, target.zone, target.readPreference)) ||
-        reduced;
-    }
-
-    return reduced;
-  } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : String(error);
-    getLogger().error(`AutoCompact monitoring failed: ${errorMsg}`);
-    return false;
-  }
-}
-
-async function runAutoCompactOnTarget(
-  db: Db,
-  collectionName: string,
   targetLabel: string,
   readPreference?: ReadPreferenceOptions
 ): Promise<boolean> {
-  getLogger().info(`Enabling autoCompact for "${collectionName}" on ${targetLabel}...`);
+  getLogger().info(`Enabling autoCompact on ${targetLabel}...`);
 
-  await runCommandWithReadPreference(
-    db,
-    {
-      autoCompact: true,
-      freeSpaceTargetMB: 10,
-      runOnce: true
-    },
-    readPreference
-  );
-
-  getLogger().info(`AutoCompact enabled on ${targetLabel}, monitoring size...`);
-
-  const startStats = await runCommandWithReadPreference(
-    db,
-    { collStats: collectionName },
-    readPreference
-  );
-  const startSize = startStats.size || 0;
-
-  let reduced = false;
-  const startTime = Date.now();
-
-  while (Date.now() - startTime < AUTOCOMPACT_POLL_TIMEOUT_MS) {
-    await new Promise(resolve => setTimeout(resolve, AUTOCOMPACT_POLL_INTERVAL_MS));
-
-    const currentStats = await runCommandWithReadPreference(
+  try {
+    // Enable autoCompact with runOnce
+    await runAdminCommandWithReadPreference(
       db,
-      { collStats: collectionName },
+      {
+        autoCompact: true,
+        freeSpaceTargetMB: 10,
+        runOnce: true
+      },
       readPreference
     );
-    const currentSize = currentStats.size || 0;
 
-    if (currentSize < startSize) {
-      getLogger().info(
-        `✅ ${targetLabel} size reduced: ${bytesToMB(startSize).toFixed(0)}MB → ${bytesToMB(currentSize).toFixed(0)}MB`
-      );
-      reduced = true;
-      break;
+    getLogger().info(`AutoCompact enabled on ${targetLabel}, monitoring progress...`);
+
+    const startTime = Date.now();
+
+    // Poll currentOp until autoCompact completes or times out
+    while (Date.now() - startTime < AUTOCOMPACT_POLL_TIMEOUT_MS) {
+      await new Promise(resolve => setTimeout(resolve, AUTOCOMPACT_POLL_INTERVAL_MS));
+
+      const stillRunning = await isAutoCompactRunning(db, readPreference);
+      if (!stillRunning) {
+        getLogger().info(`AutoCompact runOnce completed on ${targetLabel}.`);
+        return true;
+      }
     }
 
-    const stillRunning = await isAutoCompactRunning(db, readPreference);
-    if (!stillRunning) {
-      getLogger().info(`AutoCompact runOnce completed on ${targetLabel}.`);
-      break;
+    getLogger().warn(`AutoCompact on ${targetLabel} timed out after ${AUTOCOMPACT_POLL_TIMEOUT_MS}ms`);
+    return false;
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    getLogger().error(`AutoCompact failed on ${targetLabel}: ${errorMsg}`);
+    return false;
+  } finally {
+    // Always disable autoCompact
+    try {
+      await runAdminCommandWithReadPreference(
+        db,
+        { autoCompact: false },
+        readPreference
+      );
+      getLogger().info(`AutoCompact disabled on ${targetLabel}`);
+    } catch (error) {
+      getLogger().warn(`Failed to disable autoCompact on ${targetLabel}: ${error}`);
     }
   }
-
-  await runCommandWithReadPreference(
-    db,
-    { autoCompact: false },
-    readPreference
-  );
-
-  getLogger().info(`AutoCompact disabled on ${targetLabel}`);
-  return reduced;
 }
 
 async function isAutoCompactRunning(

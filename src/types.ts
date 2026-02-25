@@ -342,6 +342,9 @@ export interface CompactConfig extends RebuildConfig {
   /** Enable autoCompact after convergence for MongoDB 8.0+ (default false) */
   autoCompact?: boolean;
 
+  /** Force manual compact even on MongoDB 8.0+ (bypasses autoCompact) */
+  forceManualCompact?: boolean;
+
   /** Timeout in seconds for replSetStepDown command (default 120) */
   stepDownTimeoutSeconds?: number;
 }

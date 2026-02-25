@@ -126,6 +126,7 @@ export async function rebuildCollectionIndexes(
         'Aborted by user at collection confirmation step.'
       );
       getLogger().warn("User aborted the operation.");
+      return { status: 'skipped', log: collectionLog };
     }
     if (responseChar === 'b') {
       getLogger().info(`Skipping collection "${collectionName}".`);

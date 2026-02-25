@@ -101,13 +101,22 @@ mongodb-reindex rebuild \
 - `--min-convergence-size-mb <mb>` - Minimum measurement size in MB to count toward convergence (default 5000)
 - `--force-stepdown` - Force primary stepDown for MongoDB <8.0
 - `--stepdown-timeout <seconds>` - Timeout in seconds for replSetStepDown (default 120)
-- `--no-auto-compact` - Disable autoCompact for MongoDB 8.0+ (manual compact only)
+- `--force-manual-compact` - Force per-collection manual `compact` even on MongoDB 8.0+ (useful with `--specified-collections` or `--ignored-collections`)
 
 #### Compact Behavior Notes
 
-- For MongoDB 8.0+, autoCompact is enabled by default. It runs the `autoCompact` command on the primary and on distinct secondary targets (using `availabilityZone` replica set tags when available) and skips manual compact. Use `--no-auto-compact` to force manual compact.
-- For MongoDB versions that do not support `autoCompact`, the tool runs manual `compact` on distinct secondary targets, never on the primary. 
-- If the replica set has fewer than two distinct secondary targets, the tool continues with available nodes and logs a warning.
+`autoCompact` (MongoDB 8.0+) is a **node-level** operation — it compacts all collections on a node. It is issued as an admin command (`db.admin().command({ autoCompact: true, runOnce: true, freeSpaceTargetMB })`) and must be run separately on each node (primary and each secondary).
+
+**Version behavior:**
+
+| MongoDB version | Default behavior | With `--force-manual-compact` |
+|---|---|---|
+| < 8.0 | Per-collection manual `compact` on distinct secondary targets | N/A (flag ignored, manual compact always used) |
+| >= 8.0 | Node-level `autoCompact` on primary and distinct secondaries | Per-collection manual `compact` on distinct secondaries |
+
+- When `--specified-collections` or `--ignored-collections` is provided on a MongoDB 8.0+ cluster **without** `--force-manual-compact`, the tool will prompt in interactive mode whether to switch to manual per-collection `compact`, because `autoCompact` cannot target specific collections.
+- Use `--force-manual-compact` with `--specified-collections` or `--ignored-collections` when you want to compact only specific collections on MongoDB 8.0+.
+- For replica sets with fewer than two distinct secondary targets, the tool continues with available nodes and logs a warning.
 
 ### As a Library
 

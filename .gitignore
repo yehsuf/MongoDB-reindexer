@@ -165,3 +165,6 @@ rebuild_logs/
 /scripts/test-with-env.sh
 /scripts/load-env.sh
 /.rebuild_runtime/
+
+#spec-kit files
+.specify/

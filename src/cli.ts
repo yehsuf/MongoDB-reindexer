@@ -241,6 +241,11 @@ program
     '--no-auto-compact',
     'Disable autoCompact for MongoDB 8.0+ (manual compact only)'
   )
+  .option(
+    '--force-manual-compact',
+    'Force manual compact even on MongoDB 8.0+ (bypasses autoCompact)'
+  )
+  .option('--no-safe-run', 'Disable interactive prompts (dangerous!)')
   .action(async (options) => {
     let client: MongoClient | null = null;
 
@@ -276,7 +281,8 @@ program
         forceStepdown: options.forceStepdown || false,
         stepDownTimeoutSeconds: parseInt(options.stepdownTimeout, 10) || 120,
         autoCompact: options.autoCompact || false,
-        safeRun: false
+        forceManualCompact: options.forceManualCompact || false,
+        safeRun: options.safeRun
       };
 
       config.specifiedCollections = parseCommaSeparated(options.specifiedCollections);
