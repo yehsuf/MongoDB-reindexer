@@ -64,7 +64,7 @@ echo ""
 
 # Test 3: Cleanup after rebuild (users)
 info "Running cleanup after rebuild (users collection)..."
-if ./dist/cli.js cleanup --uri "$URI" --database "$DB" --specified-collections users --no-safe-run > /tmp/indexes_after_users.txt 2>&1; then
+if ./dist/cli.js cleanup --uri "$URI" --database "$DB" > /tmp/indexes_after_users.txt 2>&1; then
   success "Users cleanup after rebuild succeeded"
   head -20 /tmp/indexes_after_users.txt
 else
