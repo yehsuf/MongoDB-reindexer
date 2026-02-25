@@ -30,10 +30,17 @@ function makeCollection(overrides: Partial<{
 }
 
 function makeDb(overrides: Partial<{
-  command: (cmd: any) => Promise<any>;
+  aggregateResults?: any[];
+  aggregateThrows?: boolean;
 }> = {}) {
   return {
-    command: mock.fn(overrides.command ?? (async (_cmd: any) => ({ indexSizes: {} }))),
+    collection: (_name: string) => ({
+      aggregate: (_pipeline: any[]) => ({
+        toArray: overrides.aggregateThrows
+          ? async () => { throw new Error('aggregate failed'); }
+          : async () => overrides.aggregateResults ?? [],
+      }),
+    }),
   };
 }
 
@@ -239,9 +246,9 @@ describe('Group 2 — checkCoveringIndexStatus', () => {
 
 describe('Group 3 — getIndexSizeBytes', () => {
   // ── Test 9 ─────────────────────────────────────────────────────────────────
-  it('returns the correct byte size when collStats contains the named index', async () => {
+  it('returns the correct byte size when $indexStats contains the named index', async () => {
     const db = makeDb({
-      command: async (_cmd: any) => ({ indexSizes: { myIndex: 12345 } }),
+      aggregateResults: [{ name: 'myIndex', size: 12345 }],
     });
 
     const size = await getIndexSizeBytes(db as any, 'myCollection', 'myIndex');
@@ -249,12 +256,8 @@ describe('Group 3 — getIndexSizeBytes', () => {
   });
 
   // ── Test 10 ────────────────────────────────────────────────────────────────
-  it('returns null (fail-open) when db.command throws', async () => {
-    const db = makeDb({
-      command: async (_cmd: any) => {
-        throw new Error('command failed');
-      },
-    });
+  it('returns null (fail-open) when aggregate throws', async () => {
+    const db = makeDb({ aggregateThrows: true });
 
     // Must not throw
     const size = await getIndexSizeBytes(db as any, 'myCollection', 'myIndex');

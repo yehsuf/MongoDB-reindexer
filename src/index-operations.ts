@@ -257,13 +257,14 @@ export async function waitForIndexBuild(
   timeoutMs: number,
   onPoll?: (elapsedMs: number) => void
 ): Promise<'complete' | 'timeout' | 'not_found'> {
+  const effectiveTimeout = Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 7_200_000;
   const startedAt = Date.now();
   let delay = 5_000;
   let atlasM0Mode = false;
 
   while (true) {
     const elapsed = Date.now() - startedAt;
-    if (elapsed >= timeoutMs) return 'timeout';
+    if (elapsed >= effectiveTimeout) return 'timeout';
 
     const allIndexes = await collection.indexes();
     const idx = allIndexes.find((i: any) => i.name === indexName);
@@ -296,6 +297,7 @@ export async function waitForIndexBuild(
 
 /**
  * Returns the on-disk size in bytes for a specific index, or null if unavailable.
+ * Uses $indexStats aggregation (cheaper than collStats — no collection scan).
  */
 export async function getIndexSizeBytes(
   db: Db,
@@ -303,10 +305,11 @@ export async function getIndexSizeBytes(
   indexName: string
 ): Promise<number | null> {
   try {
-    const result = await db.command({ collStats: collectionName });
-    const sizes: Record<string, number> = result?.indexSizes ?? {};
-    const size = sizes[indexName];
-    return typeof size === 'number' ? size : null;
+    const collection = db.collection(collectionName);
+    const stats = await collection.aggregate([{ $indexStats: {} }]).toArray();
+    const indexStat = (stats as any[]).find(s => s.name === indexName);
+    const size = indexStat?.size;
+    return typeof size === 'number' && size >= 0 ? size : null;
   } catch {
     return null;
   }
