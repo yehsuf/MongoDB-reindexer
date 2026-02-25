@@ -13,7 +13,8 @@ import {
   DatabaseLog,
   IndexDocument,
   VALID_INDEX_OPTIONS,
-  RebuildCoordinator
+  RebuildCoordinator,
+  IndexRebuildProgress
 } from './types.js';
 import { isIgnored } from './mongodb-utils.js';
 import { promptUser } from './prompts.js';
@@ -24,7 +25,7 @@ import {
 } from './file-utils.js';
 import { RebuildPaths } from './types.js';
 import { getLogger } from './logger.js';
-import { verifyIndex, canReuseCoveringIndex } from './index-operations.js';
+import { verifyIndex, checkCoveringIndexStatus, waitForIndexBuild, getIndexSizeBytes } from './index-operations.js';
 
 /**
  * Helper to safely notify coordinator methods
@@ -41,6 +42,38 @@ async function notifyCoordinator<K extends keyof RebuildCoordinator>(
       getLogger().debug(`Coordinator.${method} threw: ${e}`);
     }
   }
+}
+
+/**
+ * Records the current rebuild stage to the state file for connection-drop resilience.
+ */
+async function recordStage(
+  state: RebuildState,
+  paths: RebuildPaths,
+  progress: IndexRebuildProgress
+): Promise<void> {
+  state.inProgress = { ...progress, updatedAt: new Date().toISOString() };
+  await writeJsonFile(paths.stateFile, state);
+}
+
+/**
+ * Returns false (and blocks stage 6) if the main index is suspiciously smaller than the
+ * covering index, which would indicate an incomplete or corrupt rebuild.
+ * Fail-open: returns true when sizes cannot be measured.
+ */
+async function coveringSizeIsAcceptable(
+  db: Db,
+  collectionName: string,
+  coveringName: string,
+  mainName: string,
+  tolerance = 0.9
+): Promise<boolean> {
+  const coveringSize = await getIndexSizeBytes(db, collectionName, coveringName);
+  const mainSize = await getIndexSizeBytes(db, collectionName, mainName);
+  if (coveringSize === null || coveringSize === 0 || mainSize === null || mainSize === 0) {
+    return true; // fail-open: can't measure, don't block
+  }
+  return mainSize >= coveringSize * tolerance;
 }
 
 /**
@@ -94,6 +127,7 @@ export async function rebuildCollectionIndexes(
   }
 
   const sortedIndexes = processableIndexes.sort((a, b) => (b.size || 0) - (a.size || 0));
+  const buildWaitTimeoutMs = config.buildWaitTimeoutMs ?? 7_200_000;
 
   getLogger().info(`\n--- Collection: "${collectionName}" ---`);
   getLogger().info(`\nFound ${sortedIndexes.length} index(es) to rebuild in this collection (largest first):`);
@@ -189,6 +223,7 @@ export async function rebuildCollectionIndexes(
       // Retry logic wrapper
       let attemptCount = 0;
       let rebuildSuccess = false;
+      let shouldSkipToVerifyMain = false;
       const maxAttempts = 2; // Initial attempt + 1 retry
 
       while (attemptCount < maxAttempts && !rebuildSuccess) {
@@ -198,96 +233,171 @@ export async function rebuildCollectionIndexes(
             getLogger().warn(`  ⚠️  Retry attempt ${attemptCount - 1} for index "${originalName}"...`);
           }
 
-          // Check for existing covering index from previous runs
+          // ──────────────────────────────────────────────────────────────────
+          // Fast-path: main index finished building server-side during a prior
+          // connection drop. Skip stages 1–4 and go directly to verify + cleanup.
+          // ──────────────────────────────────────────────────────────────────
+          if (shouldSkipToVerifyMain) {
+            shouldSkipToVerifyMain = false;
+            getLogger().info(`  [5/6] Resuming: verifying server-side-built final index '${originalName}'...`);
+            if (!await verifyIndex(collection, originalName, originalKey, originalOptions)) {
+              throw new Error(`CRITICAL: Final index '${originalName}' is invalid after server-side build.`);
+            }
+            const mainSizeResume = await getIndexSizeBytes(db, collectionName, originalName);
+            await recordStage(state, paths, { ...state.inProgress!, stage: 5, mainIndexSizeBytes: mainSizeResume ?? undefined });
+            const sizeOkResume = await coveringSizeIsAcceptable(db, collectionName, coveringName, originalName, 0.9);
+            if (!sizeOkResume) {
+              throw new Error(
+                `CRITICAL: Main index '${originalName}' is unexpectedly small compared to covering index '${coveringName}'. ` +
+                `Refusing to drop covering safety net. Manual verification required.`
+              );
+            }
+            await recordStage(state, paths, { ...state.inProgress!, stage: 6 });
+            getLogger().info(`  [6/6] Calling dropIndex for covering index '${coveringName}'...`);
+            await collection.dropIndex(coveringName);
+            getLogger().info(`  -> Command completed.`);
+            state.inProgress = undefined;
+          } else {
+
+          // ──────────────────────────────────────────────────────────────────
+          // Normal path: stages 1–6
+          // ──────────────────────────────────────────────────────────────────
+
+          // Build the expected covering options once (used in both detection and creation)
+          const expectedCoveringOptions: Record<string, any> = {};
+          if (coveringOptions.partialFilterExpression) {
+            expectedCoveringOptions.partialFilterExpression = coveringOptions.partialFilterExpression;
+          }
+
+          // Determine the state of any pre-existing covering index (Error 1 fix)
           let coveringIndexExists = false;
           try {
-            const allIndexes = await collection.indexes();
-            getLogger().debug(`  [DEBUG] Total indexes in collection: ${allIndexes.length}`);
-            getLogger().debug(`  [DEBUG] Looking for covering index: '${coveringName}'`);
+            const coveringStatus = await checkCoveringIndexStatus(
+              collection, coveringName, coveringKey as Record<string, unknown>
+            );
+            getLogger().debug(`  [DEBUG] checkCoveringIndexStatus='${coveringStatus}' for '${coveringName}'`);
 
-            const existingCovering = allIndexes.find(i => i.name === coveringName);
-
-            if (existingCovering) {
-              getLogger().debug(`  [DEBUG] Found existing covering index`);
-              getLogger().debug(`  [DEBUG] Existing index key: ${JSON.stringify(existingCovering.key)}`);
-              getLogger().debug(`  [DEBUG] Expected covering key: ${JSON.stringify(coveringKey)}`);
-              getLogger().debug(`  [DEBUG] Existing buildState: ${(existingCovering as any).buildState || 'none'}`);
-
-              getLogger().info(`  [1/6] Found existing covering index '${coveringName}' from previous run. Verifying...`);
-
-              // Verify the existing covering index
-              const expectedCoveringOptions: Record<string, any> = {};
-              if (coveringOptions.partialFilterExpression) {
-                expectedCoveringOptions.partialFilterExpression = coveringOptions.partialFilterExpression;
-              }
-              getLogger().debug(`  [DEBUG] Expected covering options: ${JSON.stringify(expectedCoveringOptions)}`);
-
-              const isValid = await canReuseCoveringIndex(collection, coveringName, coveringKey, expectedCoveringOptions);
-              getLogger().debug(`  [DEBUG] canReuseCoveringIndex returned: ${isValid}`);
-
-              if (isValid) {
-                getLogger().info(`  ✅ Existing covering index is valid and ready. Reusing it (skipping creation).`);
-                getLogger().debug(`  [DEBUG] Will skip createIndex step`);
-                coveringIndexExists = true;
-              } else {
-                getLogger().warn(`  ⚠️  Existing covering index is invalid or incomplete. Will rebuild.`);
-                getLogger().debug(`  [DEBUG] Will drop invalid covering index and recreate`);
-                // Drop the invalid covering index
-                try {
-                  await collection.dropIndex(coveringName);
-                  getLogger().info(`  🧹 Dropped invalid covering index.`);
-                  getLogger().debug(`  [DEBUG] Successfully dropped invalid covering index`);
-                } catch (dropErr) {
-                  getLogger().warn(`  Warning: Could not drop invalid covering index: ${dropErr}`);
-                  getLogger().debug(`  [DEBUG] Error dropping invalid covering index: ${dropErr}`);
-                }
-              }
-            } else {
+            if (coveringStatus === 'absent') {
               getLogger().debug(`  [DEBUG] No existing covering index found with name: '${coveringName}'`);
-              getLogger().debug(`  [DEBUG] Available indexes: ${allIndexes.map(i => i.name).join(', ')}`);
+
+            } else if (coveringStatus === 'building') {
+              // Server is still building — do NOT drop; wait for it to finish
+              getLogger().warn(`  ⚠️  Covering index '${coveringName}' is still building server-side. Waiting for it to complete…`);
+              const waitResult = await waitForIndexBuild(
+                collection, coveringName, buildWaitTimeoutMs,
+                (elapsed) => getLogger().info(`  ⏳ Still waiting for covering index build… (${Math.round(elapsed / 1000)}s elapsed)`)
+              );
+              if (waitResult === 'complete') {
+                const recheck = await checkCoveringIndexStatus(
+                  collection, coveringName, coveringKey as Record<string, unknown>
+                );
+                if (recheck === 'ready') {
+                  getLogger().info(`  ✅ Covering index build completed. Reusing it (skipping stages 1–2).`);
+                  coveringIndexExists = true;
+                  if (!state.inProgress) {
+                    await recordStage(state, paths, {
+                      collectionName, indexName: originalName, coveringIndexName: coveringName,
+                      stage: 2, startedAt: new Date().toISOString(), updatedAt: ''
+                    });
+                  }
+                } else {
+                  getLogger().warn(`  ⚠️  Covering index is invalid after build completion. Dropping and rebuilding.`);
+                  await collection.dropIndex(coveringName);
+                }
+              } else if (waitResult === 'not_found') {
+                getLogger().warn(`  ⚠️  Covering index disappeared during wait (pre-5.0 crash). Will recreate.`);
+              } else {
+                throw new Error(`Covering index build timed out after ${buildWaitTimeoutMs}ms.`);
+              }
+
+            } else if (coveringStatus === 'invalid') {
+              getLogger().warn(`  ⚠️  Existing covering index '${coveringName}' is invalid (key mismatch). Dropping and rebuilding.`);
+              try {
+                await collection.dropIndex(coveringName);
+                getLogger().info(`  🧹 Dropped invalid covering index.`);
+              } catch (dropErr) {
+                getLogger().warn(`  Warning: Could not drop invalid covering index: ${dropErr}`);
+              }
+
+            } else if (coveringStatus === 'ready') {
+              getLogger().info(`  ✅ Existing covering index '${coveringName}' is valid. Reusing it (skipping stages 1–2).`);
+              coveringIndexExists = true;
+              if (!state.inProgress) {
+                await recordStage(state, paths, {
+                  collectionName, indexName: originalName, coveringIndexName: coveringName,
+                  stage: 2, startedAt: new Date().toISOString(), updatedAt: ''
+                });
+              }
             }
           } catch (checkErr) {
             getLogger().debug(`  Could not check for existing covering index: ${checkErr}`);
-            getLogger().debug(`  [DEBUG] Error type: ${checkErr instanceof Error ? checkErr.constructor.name : typeof checkErr}`);
             getLogger().debug(`  [DEBUG] Will continue with normal flow and create new covering index`);
             // Continue with normal flow
           }
 
-          // Create covering index if it doesn't exist or was invalid
+          // Ensure inProgress is initialised before any stage-3 recordStage call
+          if (!state.inProgress) {
+            state.inProgress = {
+              collectionName, indexName: originalName, coveringIndexName: coveringName,
+              stage: coveringIndexExists ? 2 : 1,
+              startedAt: new Date().toISOString(), updatedAt: new Date().toISOString()
+            };
+          }
+
+          // [1/6] Create covering index (skip if already verified above)
           if (!coveringIndexExists) {
+            await recordStage(state, paths, {
+              collectionName, indexName: originalName, coveringIndexName: coveringName,
+              stage: 1, startedAt: state.inProgress.startedAt, updatedAt: ''
+            });
             getLogger().info(`  [1/6] Calling createIndex for covering index '${coveringName}'.`);
             await collection.createIndex(coveringKey, coveringOptions);
             getLogger().info(`  -> Command completed.`);
 
             getLogger().info(`  [2/6] Calling verifyIndex for covering index...`);
-            const expectedCoveringOptions: Record<string, any> = {};
-            if (coveringOptions.partialFilterExpression) {
-              expectedCoveringOptions.partialFilterExpression = coveringOptions.partialFilterExpression;
-            }
             if (!await verifyIndex(collection, coveringName, coveringKey, expectedCoveringOptions)) {
               throw new Error(`Safety check failure for covering index.`);
             }
+            const coveringSize = await getIndexSizeBytes(db, collectionName, coveringName);
+            await recordStage(state, paths, { ...state.inProgress, stage: 2, coveringIndexSizeBytes: coveringSize ?? undefined });
           } else {
-            // Covering index already exists and is valid
             getLogger().info(`  [2/6] Covering index already verified. Proceeding with rebuild.`);
           }
 
+          // [3/6] Drop original index
+          await recordStage(state, paths, { ...state.inProgress, stage: 3 });
           getLogger().info(`  [3/6] Calling dropIndex for old index '${originalName}'...`);
           await collection.dropIndex(originalName);
           getLogger().info(`  -> Command completed.`);
 
+          // [4/6] Build the final index
+          await recordStage(state, paths, { ...state.inProgress, stage: 4 });
           getLogger().info(`  [4/6] Calling createIndex for final index '${originalName}'. THIS IS THE MAIN BUILD.`);
           await collection.createIndex(originalKey, {...originalOptions, name: originalName});
           getLogger().info(`  -> Command completed.`);
 
+          // [5/6] Verify the final index
           getLogger().info(`  [5/6] Calling verifyIndex for final rebuilt index...`);
           if (!await verifyIndex(collection, originalName, originalKey, originalOptions)) {
             throw new Error(`CRITICAL: Final index '${originalName}' is invalid.`);
           }
+          const mainSize = await getIndexSizeBytes(db, collectionName, originalName);
+          await recordStage(state, paths, { ...state.inProgress, stage: 5, mainIndexSizeBytes: mainSize ?? undefined });
 
+          // [6/6] Size sanity gate — refuse to drop the safety net if main looks too small
+          const sizeOk = await coveringSizeIsAcceptable(db, collectionName, coveringName, originalName, 0.9);
+          if (!sizeOk) {
+            throw new Error(
+              `CRITICAL: Main index '${originalName}' is unexpectedly small compared to covering index '${coveringName}'. ` +
+              `Refusing to drop covering safety net. Manual verification required.`
+            );
+          }
+          await recordStage(state, paths, { ...state.inProgress, stage: 6 });
           getLogger().info(`  [6/6] Calling dropIndex for covering index '${coveringName}'...`);
           await collection.dropIndex(coveringName);
           getLogger().info(`  -> Command completed.`);
+          state.inProgress = undefined;
+          } // end else (normal stages 1–6)
 
           // Success - record time and metrics
           indexLog.timeSeconds = (new Date().getTime() - indexLog.startTime.getTime()) / 1000;
@@ -301,6 +411,7 @@ export async function rebuildCollectionIndexes(
             state.completed[collectionName] = [];
           }
           state.completed[collectionName].push(originalName);
+          state.inProgress = undefined;
           writeJsonFile(paths.stateFile, state);
           getLogger().info(`  💾 State file updated.`);
 
@@ -323,15 +434,43 @@ export async function rebuildCollectionIndexes(
 
           if (attemptCount < maxAttempts) {
             getLogger().warn(`  ⚠️  Will retry once more...`);
-            // Clean up any partial state before retry
-            try {
-              const allIndexes = await collection.indexes();
-              if (allIndexes.find(i => i.name === coveringName)) {
-                getLogger().info(`  🧹 Cleaning up covering index before retry...`);
-                await collection.dropIndex(coveringName);
+            // Stage-aware cleanup before retry (Error 2 fix)
+            const currentStage = state.inProgress?.stage ?? 0;
+            if (currentStage >= 3) {
+              // Original index already dropped — covering is the ONLY copy. Never drop it here.
+              getLogger().warn(`  🛡️  Stage ${currentStage}: original index already dropped. Preserving covering index '${coveringName}'.`);
+              try {
+                const allIdxs = await collection.indexes();
+                const mainIdx = allIdxs.find((i: any) => i.name === originalName);
+                if (mainIdx && (mainIdx as any).buildState) {
+                  getLogger().warn(`  ⚠️  Main index '${originalName}' is still building server-side. Waiting…`);
+                  const waitResult = await waitForIndexBuild(
+                    collection, originalName, buildWaitTimeoutMs,
+                    (elapsed) => getLogger().info(`  ⏳ Still waiting for main index build… (${Math.round(elapsed / 1000)}s elapsed)`)
+                  );
+                  if (waitResult === 'complete') {
+                    getLogger().info(`  ✅ Main index '${originalName}' build completed. Will verify and finalize on next attempt.`);
+                    shouldSkipToVerifyMain = true;
+                  } else if (waitResult === 'not_found') {
+                    getLogger().warn(`  ⚠️  Main index not found — will retry createIndex from stage 4.`);
+                  } else {
+                    getLogger().error(`  Main index build timed out. Covering index '${coveringName}' is preserved as safety fallback.`);
+                  }
+                }
+              } catch (innerErr) {
+                getLogger().warn(`  Unable to probe main index state: ${innerErr}. Covering index preserved.`);
               }
-            } catch (cleanupError) {
-              getLogger().debug(`  Cleanup error (non-critical): ${cleanupError}`);
+            } else {
+              // Stage 1 or 2: original index still exists. Safe to drop covering.
+              try {
+                const allIndexes = await collection.indexes();
+                if (allIndexes.find(i => i.name === coveringName)) {
+                  getLogger().info(`  🧹 Cleaning up covering index before retry...`);
+                  await collection.dropIndex(coveringName);
+                }
+              } catch (cleanupError) {
+                getLogger().debug(`  Cleanup error (non-critical): ${cleanupError}`);
+              }
             }
             // Small delay before retry
             await new Promise(resolve => setTimeout(resolve, 1000));
@@ -366,6 +505,10 @@ export async function rebuildCollectionIndexes(
             if (e instanceof Error && e.stack) {
               getLogger().debug(`  Stack trace: ${e.stack}`);
             }
+
+            // Clear stale inProgress so subsequent indexes start fresh
+            state.inProgress = undefined;
+            await writeJsonFile(paths.stateFile, state);
           }
         }
       }
