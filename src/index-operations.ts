@@ -3,7 +3,7 @@
  * Handles index verification and safety checks
  */
 
-import { Collection } from 'mongodb';
+import { Collection, Db } from 'mongodb';
 import { VALID_INDEX_OPTIONS } from './types.js';
 import { getLogger } from './logger.js';
 
@@ -215,5 +215,102 @@ export async function canReuseCoveringIndex(
     getLogger().debug(`  [REUSE] ❌ Error checking if index can be reused: ${e}`);
     getLogger().debug(`  [REUSE] ===== FUNCTION CALL END (ERROR) =====`);
     return false;
+  }
+}
+
+/**
+ * Determines the readiness state of a covering index without being destructive.
+ * Returns:
+ *   'absent'   – index does not exist at all
+ *   'building' – index exists but has a buildState (still in progress server-side)
+ *   'invalid'  – index exists but key spec does not match
+ *   'ready'    – index exists, not building, and key matches
+ */
+export async function checkCoveringIndexStatus(
+  collection: Collection,
+  indexName: string,
+  key: Record<string, unknown>
+): Promise<'ready' | 'building' | 'invalid' | 'absent'> {
+  try {
+    const allIndexes = await collection.indexes();
+    const idx = allIndexes.find((i: any) => i.name === indexName);
+    if (!idx) return 'absent';
+    if ((idx as any).buildState) return 'building';
+    const keyMatches = JSON.stringify(idx.key) === JSON.stringify(key);
+    if (!keyMatches) return 'invalid';
+    return 'ready';
+  } catch {
+    return 'absent';
+  }
+}
+
+/**
+ * Polls until a named index build completes, times out, or the index disappears.
+ * Returns:
+ *   'complete'  – index finished building
+ *   'timeout'   – timeoutMs elapsed with build still in progress
+ *   'not_found' – index no longer appears in collection.indexes()
+ */
+export async function waitForIndexBuild(
+  collection: Collection,
+  indexName: string,
+  timeoutMs: number,
+  onPoll?: (elapsedMs: number) => void
+): Promise<'complete' | 'timeout' | 'not_found'> {
+  const effectiveTimeout = Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 7_200_000;
+  const startedAt = Date.now();
+  let delay = 5_000;
+  let atlasM0Mode = false;
+
+  while (true) {
+    const elapsed = Date.now() - startedAt;
+    if (elapsed >= effectiveTimeout) return 'timeout';
+
+    const allIndexes = await collection.indexes();
+    const idx = allIndexes.find((i: any) => i.name === indexName);
+    if (!idx) return 'not_found';
+    if (!(idx as any).buildState) return 'complete';
+
+    // Corroborate with $indexStats if the tier permits it
+    if (!atlasM0Mode) {
+      try {
+        const stats = await collection.aggregate([{ $indexStats: {} }]).toArray();
+        const stat = (stats as any[]).find(s => s.name === indexName);
+        if (stat && stat.building === false) return 'complete';
+      } catch (err: any) {
+        const msg = String(err?.message ?? '').toLowerCase();
+        if (
+          msg.includes('not authorized') ||
+          msg.includes('unauthorized') ||
+          msg.includes('not supported')
+        ) {
+          atlasM0Mode = true;
+        }
+      }
+    }
+
+    onPoll?.(elapsed);
+    await new Promise(resolve => setTimeout(resolve, delay));
+    delay = Math.min(delay * 1.5, 30_000);
+  }
+}
+
+/**
+ * Returns the on-disk size in bytes for a specific index, or null if unavailable.
+ * Uses $indexStats aggregation (cheaper than collStats — no collection scan).
+ */
+export async function getIndexSizeBytes(
+  db: Db,
+  collectionName: string,
+  indexName: string
+): Promise<number | null> {
+  try {
+    const collection = db.collection(collectionName);
+    const stats = await collection.aggregate([{ $indexStats: {} }]).toArray();
+    const indexStat = (stats as any[]).find(s => s.name === indexName);
+    const size = indexStat?.size;
+    return typeof size === 'number' && size >= 0 ? size : null;
+  } catch {
+    return null;
   }
 }

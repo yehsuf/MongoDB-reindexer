@@ -32,13 +32,13 @@ success() { echo -e "${GREEN}✓${NC} $1"; }
 info() { echo -e "${BLUE}ℹ${NC} $1"; }
 error() { echo -e "${RED}✗${NC} $1"; }
 
-# Test 1: List indexes before
-info "Listing indexes before rebuild (users collection)..."
-if ./dist/cli.js list --uri "$URI" --database "$DB" --collection users --no-safe-run > /tmp/indexes_before.txt 2>&1; then
-  success "Initial list succeeded"
+# Test 1: Dry-run rebuild on users collection before
+info "Checking users collection before rebuild..."
+if ./dist/cli.js rebuild --uri "$URI" --database "$DB" --specified-collections users --no-safe-run > /tmp/indexes_before.txt 2>&1; then
+  success "Initial rebuild (users) succeeded"
   head -20 /tmp/indexes_before.txt
 else
-  error "Initial list failed"
+  error "Initial rebuild (users) failed"
   cat /tmp/indexes_before.txt
   exit 1
 fi
@@ -50,9 +50,8 @@ info "Rebuilding users collection..."
 if ./dist/cli.js rebuild \
   --uri "$URI" \
   --database "$DB" \
-  --collection users \
-  --no-safe-run \
-  --verbose > /tmp/rebuild_users.txt 2>&1; then
+  --specified-collections users \
+  --no-safe-run > /tmp/rebuild_users.txt 2>&1; then
   success "Users rebuild succeeded"
   tail -10 /tmp/rebuild_users.txt
 else
@@ -63,43 +62,43 @@ fi
 
 echo ""
 
-# Test 3: List indexes after rebuild (users)
-info "Listing indexes after rebuild (users collection)..."
-if ./dist/cli.js list --uri "$URI" --database "$DB" --collection users --no-safe-run > /tmp/indexes_after_users.txt 2>&1; then
-  success "Users list after rebuild succeeded"
+# Test 3: Cleanup after rebuild (users)
+info "Running cleanup after rebuild (users collection)..."
+if ./dist/cli.js cleanup --uri "$URI" --database "$DB" --yes > /tmp/indexes_after_users.txt 2>&1; then
+  success "Users cleanup after rebuild succeeded"
   head -20 /tmp/indexes_after_users.txt
 else
-  error "Users list after rebuild failed"
+  error "Users cleanup after rebuild failed"
   cat /tmp/indexes_after_users.txt
   exit 1
 fi
 
 echo ""
 
-# Test 4: Rebuild products collection
-info "Rebuilding products collection..."
+# Test 4: Rebuild aggregated_customer_pages collection
+info "Rebuilding aggregated_customer_pages collection..."
 if ./dist/cli.js rebuild \
   --uri "$URI" \
   --database "$DB" \
-  --collection products \
-  --no-safe-run > /tmp/rebuild_products.txt 2>&1; then
-  success "Products rebuild succeeded"
-  tail -10 /tmp/rebuild_products.txt
+  --specified-collections aggregated_customer_pages \
+  --no-safe-run > /tmp/rebuild_aggregated_customer_pages.txt 2>&1; then
+  success "aggregated_customer_pages rebuild succeeded"
+  tail -10 /tmp/rebuild_aggregated_customer_pages.txt
 else
-  error "Products rebuild failed"
-  cat /tmp/rebuild_products.txt
+  error "aggregated_customer_pages rebuild failed"
+  cat /tmp/rebuild_aggregated_customer_pages.txt
   exit 1
 fi
 
 echo ""
 
-# Test 5: List all collections
-info "Listing all collections and indexes..."
-if ./dist/cli.js list --uri "$URI" --database "$DB" --no-safe-run > /tmp/indexes_all.txt 2>&1; then
-  success "Full list succeeded"
+# Test 5: Rebuild all collections
+info "Rebuilding all collections..."
+if ./dist/cli.js rebuild --uri "$URI" --database "$DB" --no-safe-run > /tmp/indexes_all.txt 2>&1; then
+  success "Full rebuild succeeded"
   cat /tmp/indexes_all.txt
 else
-  error "Full list failed"
+  error "Full rebuild failed"
   cat /tmp/indexes_all.txt
   exit 1
 fi

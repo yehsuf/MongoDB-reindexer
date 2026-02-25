@@ -64,10 +64,13 @@ echo "### Execution Log" >> "$RESULTS_FILE"
 echo '```' >> "$RESULTS_FILE"
 
 info "Running CLI mode tests..."
-if chmod +x scripts/test-cli-mode.sh && ./scripts/test-cli-mode.sh "$URI" "$DB" 2>&1 | tee -a "$RESULTS_FILE"; then
+chmod +x scripts/test-cli-mode.sh
+./scripts/test-cli-mode.sh "$URI" "$DB" 2>&1 | tee -a "$RESULTS_FILE"
+CLI_EXIT=${PIPESTATUS[0]}
+if [ $CLI_EXIT -eq 0 ]; then
   success "CLI mode tests passed"
 else
-  error "CLI mode tests failed"
+  error "CLI mode tests failed (exit code: $CLI_EXIT)"
 fi
 
 echo '```' >> "$RESULTS_FILE"

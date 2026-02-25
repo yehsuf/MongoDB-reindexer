@@ -101,13 +101,22 @@ mongodb-reindex rebuild \
 - `--min-convergence-size-mb <mb>` - Minimum measurement size in MB to count toward convergence (default 5000)
 - `--force-stepdown` - Force primary stepDown for MongoDB <8.0
 - `--stepdown-timeout <seconds>` - Timeout in seconds for replSetStepDown (default 120)
-- `--no-auto-compact` - Disable autoCompact for MongoDB 8.0+ (manual compact only)
+- `--force-manual-compact` - Force per-collection manual `compact` even on MongoDB 8.0+ (useful with `--specified-collections` or `--ignored-collections`)
 
 #### Compact Behavior Notes
 
-- For MongoDB 8.0+, autoCompact is enabled by default. It runs the `autoCompact` command on the primary and on distinct secondary targets (using `availabilityZone` replica set tags when available) and skips manual compact. Use `--no-auto-compact` to force manual compact.
-- For MongoDB versions that do not support `autoCompact`, the tool runs manual `compact` on distinct secondary targets, never on the primary. 
-- If the replica set has fewer than two distinct secondary targets, the tool continues with available nodes and logs a warning.
+`autoCompact` (MongoDB 8.0+) is a **node-level** operation — it compacts all collections on a node. It is issued as an admin command (`db.admin().command({ autoCompact: true, runOnce: true, freeSpaceTargetMB })`) and must be run separately on each node (primary and each secondary).
+
+**Version behavior:**
+
+| MongoDB version | Default behavior | With `--force-manual-compact` |
+|---|---|---|
+| < 8.0 | Per-collection manual `compact` on distinct secondary targets | N/A (flag ignored, manual compact always used) |
+| >= 8.0 | Node-level `autoCompact` on primary and distinct secondaries | Per-collection manual `compact` on distinct secondaries |
+
+- When `--specified-collections` or `--ignored-collections` is provided on a MongoDB 8.0+ cluster **without** `--force-manual-compact`, the tool will prompt in interactive mode whether to switch to manual per-collection `compact`, because `autoCompact` cannot target specific collections.
+- Use `--force-manual-compact` with `--specified-collections` or `--ignored-collections` when you want to compact only specific collections on MongoDB 8.0+.
+- For replica sets with fewer than two distinct secondary targets, the tool continues with available nodes and logs a warning.
 
 ### As a Library
 
@@ -209,6 +218,53 @@ The reindexer maintains cluster-aware state files for resumability:
 - Automatically resumes from last successful point
 - State file format: `.rebuild_runtime/<cluster-name>_state.json`
 
+### Connection-Drop Resilience
+
+Each index rebuild is tracked through a **6-stage pipeline**. Before every MongoDB driver call, the current stage is written to the state file. If the process is interrupted — by a network blip, pod restart, or process termination — it resumes from the correct stage on the next run, rather than starting over.
+
+#### Stage map
+
+| Stage | Operation |
+|-------|-----------|
+| 1 | Create covering (safety-net) index |
+| 2 | Verify covering index |
+| 3 | Drop original index |
+| 4 | Build final index |
+| 5 | Verify final index |
+| 6 | Drop covering index |
+
+#### Covering index: wait, don't drop
+
+If a connection drop is detected while the covering index is still building server-side (interrupted during stage 1), the tool **waits for the in-flight build to complete** instead of dropping it and restarting from scratch. This avoids discarding potentially hours of index build time on large collections.
+
+You will see:
+```
+⚠️  Covering index 'my_index_cover_temp' is still building server-side. Waiting for it to complete…
+⏳ Still waiting for covering index build… (120s elapsed)
+✅ Covering index build completed. Reusing it (skipping stages 1–2).
+```
+
+#### Main index: never lose the safety net
+
+If the connection drops after stage 3 (the original index has already been dropped), the covering index is **never touched** during retry cleanup — it is the only copy of the indexed data at that point.
+
+If the main index build is detected as still running server-side on resume, the tool waits for it to complete before proceeding to verification.
+
+#### Stage 6 size gate
+
+Before dropping the covering index at stage 6, the tool verifies that the final index size is ≥ 90% of the covering index size. If the final index appears suspiciously small — indicating a potentially incomplete or corrupt build — the covering index is **preserved** and a `CRITICAL` error is emitted. Manual verification is required before the covering safety net will be removed.
+
+#### `buildWaitTimeoutMs`
+
+Controls the maximum time to wait for a server-side index build to complete before giving up. Default: **2 hours** (7,200,000 ms). Configurable via `RebuildConfig`:
+
+```typescript
+const config: RebuildConfig = {
+  dbName: 'mydb',
+  buildWaitTimeoutMs: 10_800_000  // 3 hours
+};
+```
+
 ### Interactive Safety Mode
 
 When `safeRun: true` (default), the tool prompts for confirmation:
@@ -294,6 +350,7 @@ interface RebuildConfig {
   performanceLogging?: {
     enabled: boolean;                 // Default: true
   };
+  buildWaitTimeoutMs?: number;        // Default: 7_200_000 (2 hours)
 }
 ```
 

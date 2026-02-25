@@ -173,6 +173,7 @@ program
   .option('-u, --uri <uri>', 'MongoDB connection URI (or use MONGODB_URI env var)')
   .option('-d, --database <name>', 'Database name (or use MONGODB_DATABASE env var)')
   .option('--cover-suffix <suffix>', 'Suffix for covering indexes', DEFAULT_CONFIG.COVER_SUFFIX)
+  .option('--yes', 'Skip confirmation prompts (non-interactive mode)')
   .action(async (options) => {
     let client: MongoClient | null = null;
 
@@ -204,7 +205,8 @@ program
       const config: RebuildConfig = {
         dbName: dbName,
         coverSuffix,
-        safeRun: true  // Always use safe mode in CLI cleanup
+        safeRun: true,  // Always use safe mode in CLI cleanup
+        autoConfirm: options.yes ?? false
       };
 
       // Use the shared cleanup function
@@ -241,6 +243,11 @@ program
     '--no-auto-compact',
     'Disable autoCompact for MongoDB 8.0+ (manual compact only)'
   )
+  .option(
+    '--force-manual-compact',
+    'Force manual compact even on MongoDB 8.0+ (bypasses autoCompact)'
+  )
+  .option('--no-safe-run', 'Disable interactive prompts (dangerous!)')
   .action(async (options) => {
     let client: MongoClient | null = null;
 
@@ -276,7 +283,8 @@ program
         forceStepdown: options.forceStepdown || false,
         stepDownTimeoutSeconds: parseInt(options.stepdownTimeout, 10) || 120,
         autoCompact: options.autoCompact || false,
-        safeRun: false
+        forceManualCompact: options.forceManualCompact || false,
+        safeRun: options.safeRun
       };
 
       config.specifiedCollections = parseCommaSeparated(options.specifiedCollections);

@@ -23,6 +23,9 @@ export interface RebuildConfig {
   /** Enable interactive prompts for safety */
   safeRun?: boolean;
 
+  /** Skip confirmation prompts (non-interactive / --yes mode) */
+  autoConfirm?: boolean;
+
   /** Specific collections to process (overrides ignoredCollections) */
   specifiedCollections?: string[];
 
@@ -42,6 +45,23 @@ export interface RebuildConfig {
 
   /** Optional coordinator for rebuild lifecycle hooks */
   coordinator?: RebuildCoordinator;
+
+  /** Timeout in milliseconds to wait for a server-side index build to complete (default 7_200_000 = 2 h) */
+  buildWaitTimeoutMs?: number;
+}
+
+/**
+ * Progress tracking for an in-flight index rebuild (connection-drop resilience)
+ */
+export interface IndexRebuildProgress {
+  collectionName: string;
+  indexName: string;
+  coveringIndexName: string;
+  stage: 1 | 2 | 3 | 4 | 5 | 6;
+  coveringIndexSizeBytes?: number;
+  mainIndexSizeBytes?: number;
+  startedAt: string;   // ISO
+  updatedAt: string;   // ISO
 }
 
 /**
@@ -56,6 +76,9 @@ export interface RebuildState {
 
   /** Session history tracking */
   sessions?: SessionInfo[];
+
+  /** In-flight rebuild progress (set during rebuild, cleared on success) */
+  inProgress?: IndexRebuildProgress;
 }
 
 /**
@@ -341,6 +364,9 @@ export interface CompactConfig extends RebuildConfig {
 
   /** Enable autoCompact after convergence for MongoDB 8.0+ (default false) */
   autoCompact?: boolean;
+
+  /** Force manual compact even on MongoDB 8.0+ (bypasses autoCompact) */
+  forceManualCompact?: boolean;
 
   /** Timeout in seconds for replSetStepDown command (default 120) */
   stepDownTimeoutSeconds?: number;
