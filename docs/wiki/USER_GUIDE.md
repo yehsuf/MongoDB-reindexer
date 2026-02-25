@@ -218,6 +218,53 @@ The reindexer maintains cluster-aware state files for resumability:
 - Automatically resumes from last successful point
 - State file format: `.rebuild_runtime/<cluster-name>_state.json`
 
+### Connection-Drop Resilience
+
+Each index rebuild is tracked through a **6-stage pipeline**. Before every MongoDB driver call, the current stage is written to the state file. If the process is interrupted — by a network blip, pod restart, or process termination — it resumes from the correct stage on the next run, rather than starting over.
+
+#### Stage map
+
+| Stage | Operation |
+|-------|-----------|
+| 1 | Create covering (safety-net) index |
+| 2 | Verify covering index |
+| 3 | Drop original index |
+| 4 | Build final index |
+| 5 | Verify final index |
+| 6 | Drop covering index |
+
+#### Covering index: wait, don't drop
+
+If a connection drop is detected while the covering index is still building server-side (interrupted during stage 1), the tool **waits for the in-flight build to complete** instead of dropping it and restarting from scratch. This avoids discarding potentially hours of index build time on large collections.
+
+You will see:
+```
+⚠️  Covering index 'my_index_cover_temp' is still building server-side. Waiting for it to complete…
+⏳ Still waiting for covering index build… (120s elapsed)
+✅ Covering index build completed. Reusing it (skipping stages 1–2).
+```
+
+#### Main index: never lose the safety net
+
+If the connection drops after stage 3 (the original index has already been dropped), the covering index is **never touched** during retry cleanup — it is the only copy of the indexed data at that point.
+
+If the main index build is detected as still running server-side on resume, the tool waits for it to complete before proceeding to verification.
+
+#### Stage 6 size gate
+
+Before dropping the covering index at stage 6, the tool verifies that the final index size is ≥ 90% of the covering index size. If the final index appears suspiciously small — indicating a potentially incomplete or corrupt build — the covering index is **preserved** and a `CRITICAL` error is emitted. Manual verification is required before the covering safety net will be removed.
+
+#### `buildWaitTimeoutMs`
+
+Controls the maximum time to wait for a server-side index build to complete before giving up. Default: **2 hours** (7,200,000 ms). Configurable via `RebuildConfig`:
+
+```typescript
+const config: RebuildConfig = {
+  dbName: 'mydb',
+  buildWaitTimeoutMs: 10_800_000  // 3 hours
+};
+```
+
 ### Interactive Safety Mode
 
 When `safeRun: true` (default), the tool prompts for confirmation:
@@ -303,6 +350,7 @@ interface RebuildConfig {
   performanceLogging?: {
     enabled: boolean;                 // Default: true
   };
+  buildWaitTimeoutMs?: number;        // Default: 7_200_000 (2 hours)
 }
 ```
 
