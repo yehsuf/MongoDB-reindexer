@@ -63,14 +63,18 @@ export async function cleanupOrphanedIndexes(db: Db, config: RebuildConfig, stat
   );
 
   if (config.safeRun) {
-    const [responseChar, responseWord] = await promptUser(
-      "\nProceed with cleanup? (y/n): ",
-      ['yes', 'no'],
-      'cleanup'
-    );
-    getLogger().info(`User chose: [${responseWord}].`);
-    if (responseChar === 'n') {
-      throw new Error("User aborted cleanup operation.");
+    if (config.autoConfirm) {
+      getLogger().info('Auto-confirming cleanup (--yes flag set).');
+    } else {
+      const [responseChar, responseWord] = await promptUser(
+        "\nProceed with cleanup? (y/n): ",
+        ['yes', 'no'],
+        'cleanup'
+      );
+      getLogger().info(`User chose: [${responseWord}].`);
+      if (responseChar === 'n') {
+        throw new Error("User aborted cleanup operation.");
+      }
     }
   }
 

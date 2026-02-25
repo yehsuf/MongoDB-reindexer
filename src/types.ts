@@ -23,6 +23,9 @@ export interface RebuildConfig {
   /** Enable interactive prompts for safety */
   safeRun?: boolean;
 
+  /** Skip confirmation prompts (non-interactive / --yes mode) */
+  autoConfirm?: boolean;
+
   /** Specific collections to process (overrides ignoredCollections) */
   specifiedCollections?: string[];
 

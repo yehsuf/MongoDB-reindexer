@@ -173,6 +173,7 @@ program
   .option('-u, --uri <uri>', 'MongoDB connection URI (or use MONGODB_URI env var)')
   .option('-d, --database <name>', 'Database name (or use MONGODB_DATABASE env var)')
   .option('--cover-suffix <suffix>', 'Suffix for covering indexes', DEFAULT_CONFIG.COVER_SUFFIX)
+  .option('--yes', 'Skip confirmation prompts (non-interactive mode)')
   .action(async (options) => {
     let client: MongoClient | null = null;
 
@@ -204,7 +205,8 @@ program
       const config: RebuildConfig = {
         dbName: dbName,
         coverSuffix,
-        safeRun: true  // Always use safe mode in CLI cleanup
+        safeRun: true,  // Always use safe mode in CLI cleanup
+        autoConfirm: options.yes ?? false
       };
 
       // Use the shared cleanup function

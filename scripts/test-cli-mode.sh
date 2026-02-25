@@ -64,7 +64,7 @@ echo ""
 
 # Test 3: Cleanup after rebuild (users)
 info "Running cleanup after rebuild (users collection)..."
-if ./dist/cli.js cleanup --uri "$URI" --database "$DB" > /tmp/indexes_after_users.txt 2>&1; then
+if ./dist/cli.js cleanup --uri "$URI" --database "$DB" --yes > /tmp/indexes_after_users.txt 2>&1; then
   success "Users cleanup after rebuild succeeded"
   head -20 /tmp/indexes_after_users.txt
 else
@@ -75,18 +75,18 @@ fi
 
 echo ""
 
-# Test 4: Rebuild products collection
-info "Rebuilding products collection..."
+# Test 4: Rebuild aggregated_customer_pages collection
+info "Rebuilding aggregated_customer_pages collection..."
 if ./dist/cli.js rebuild \
   --uri "$URI" \
   --database "$DB" \
-  --specified-collections products \
-  --no-safe-run > /tmp/rebuild_products.txt 2>&1; then
-  success "Products rebuild succeeded"
-  tail -10 /tmp/rebuild_products.txt
+  --specified-collections aggregated_customer_pages \
+  --no-safe-run > /tmp/rebuild_aggregated_customer_pages.txt 2>&1; then
+  success "aggregated_customer_pages rebuild succeeded"
+  tail -10 /tmp/rebuild_aggregated_customer_pages.txt
 else
-  error "Products rebuild failed"
-  cat /tmp/rebuild_products.txt
+  error "aggregated_customer_pages rebuild failed"
+  cat /tmp/rebuild_aggregated_customer_pages.txt
   exit 1
 fi
 
